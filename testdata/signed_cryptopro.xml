@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<PurchaseOrder>
+	<Item number="130046593231">
+		<Description>Видео Игра</Description>
+		<Price>300.29</Price>
+	</Item>
+	<Buyer Id="8492340">
+		<Name>Иван Петров</Name>
+		<Address>
+			<Street>Большая Комитетская</Street>
+			<Town>Юбилейный</Town>
+			<State>МО</State>
+			<Country>Российская Федерация</Country>
+			<PostalCode>141090</PostalCode>
+		</Address>
+	</Buyer>
+<ds:Signature xmlns:ds="http://www.w3.org/2000/09/xmldsig#">
+  <ds:SignedInfo>
+   <ds:CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/>
+   <ds:SignatureMethod Algorithm="urn:ietf:params:xml:ns:cpxmlsec:algorithms:gostr34102012-gostr34112012-256"/>
+   <ds:Reference URI="">
+    <ds:Transforms>
+     <ds:Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"/>
+    </ds:Transforms>
+    <ds:DigestMethod Algorithm="urn:ietf:params:xml:ns:cpxmlsec:algorithms:gostr34112012-256"/>
+    <ds:DigestValue>tTiVS8DWjfyt6ezwZDI/2QtNbo33MD3kD0JlcANQThc=</ds:DigestValue>
+   </ds:Reference>
+  </ds:SignedInfo>
+  <ds:SignatureValue>T72uSdJAzEpD+ji+zFc7Lv2Ht6HbMVOssYr9nUPi6IN2hbXH3KvpBjXQm5oeqKni
+XuaMV2nPjQ3JPBppVXd5gw==</ds:SignatureValue>
+  <ds:KeyInfo>
+   <ds:X509Data>
+     <ds:X509Certificate>MIIDbjCCAx2gAwIBAgITEgBd2sX8Yu9Ykfl0EgABAF3axTAIBgYqhQMCAgMwfzEj
+MCEGCSqGSIb3DQEJARYUc3VwcG9ydEBjcnlwdG9wcm8ucnUxCzAJBgNVBAYTAlJV
+MQ8wDQYDVQQHEwZNb3Njb3cxFzAVBgNVBAoTDkNSWVBUTy1QUk8gTExDMSEwHwYD
+VQQDExhDUllQVE8tUFJPIFRlc3QgQ2VudGVyIDIwHhcNMjIwMjExMTQzOTA5WhcN
+MjIwNTExMTQ0OTA5WjB0MRswGQYJKoZIhvcNAQkBFgxia0Bwcm9jc3kucnUxFTAT
+BgNVBAMMDEJvcmlzIEthem1pbjEPMA0GA1UECgwGUHJvQ1N5MQ8wDQYDVQQHDAZN
+b3Njb3cxDzANBgNVBAgMBk1vc2NvdzELMAkGA1UEBhMCUlUwZjAfBggqhQMHAQEB
+ATATBgcqhQMCAiQABggqhQMHAQECAgNDAARAitQEoHBFl9SuDB0sMjU1vBEMPGAb
+ESBa7izVh3EqLZHnHf6ZvSjDhIV5eDuyEHryUDeNZ+vDsWI3NGBP1cdtZKOCAXYw
+ggFyMA4GA1UdDwEB/wQEAwIE8DATBgNVHSUEDDAKBggrBgEFBQcDAjAdBgNVHQ4E
+FgQUZJP7ivP0i3AAvFHlwD4gQM1GPC0wHwYDVR0jBBgwFoAUToM+FGnv7F16lStf
+Ef43MhZJVSswXAYDVR0fBFUwUzBRoE+gTYZLaHR0cDovL3Rlc3RjYS5jcnlwdG9w
+cm8ucnUvQ2VydEVucm9sbC9DUllQVE8tUFJPJTIwVGVzdCUyMENlbnRlciUyMDIo
+MSkuY3JsMIGsBggrBgEFBQcBAQSBnzCBnDBkBggrBgEFBQcwAoZYaHR0cDovL3Rl
+c3RjYS5jcnlwdG9wcm8ucnUvQ2VydEVucm9sbC90ZXN0LWNhLTIwMTRfQ1JZUFRP
+LVBSTyUyMFRlc3QlMjBDZW50ZXIlMjAyKDEpLmNydDA0BggrBgEFBQcwAYYoaHR0
+cDovL3Rlc3RjYS5jcnlwdG9wcm8ucnUvb2NzcC9vY3NwLnNyZjAIBgYqhQMCAgMD
+QQA6WlojoiYYSkZGEZXkjQ7ferHKAFJ6bsv1QGVlvDD03oxIKFtUH7UQrF0GfkH9
+kWnmNHn66YP9Y9iPDK21Yfv0</ds:X509Certificate>
+   </ds:X509Data>
+  </ds:KeyInfo>
+</ds:Signature></PurchaseOrder>

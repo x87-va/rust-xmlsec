@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8" standalone="no" ?><Файл ВерсПрог="DigitalAttorney-v0.0.1" ВерсФорм="0.1" ИдФайл="M2_DOVEL_760000000000___2021October4_6C5E209C-32FA-4F50-B3F4-02F5B239C137.xml">
+	<Документ КФ="02">
+		<СвДов ДатаНач="04.10.2021" ИдентОрг="" НомДовер="658400878">
+			<ДатаОкон>24.03.2022</ДатаОкон>
+			<СрокДейст/>
+		</СвДов>
+		<СвДоверит ИННЮЛ="" НаимОрг="&quot;ООО &quot;&quot;КБ КОНТРАКТ&quot;&quot;&quot;" ОГРН="">
+			<АдрРФ>
+				<АдрРус>RU, 77 г. Москва, Москва, "ПЕР АРХАНГЕЛЬСКИЙ</АдрРус>
+			</АдрРФ>
+			<СвФЛ Гражданство="RUS" Должность="" ИННФЛ="007726399821" СНИЛС="11803891755"/>
+		</СвДоверит>
+		<СвУпПред>
+			<ОблПолн>Подпись договоров, актов, первичной документации, УПД</ОблПолн>
+			<ОблПолн>67890-полномочие</ОблПолн>
+			<ОблПолн>12345</ОблПолн>
+			<СведФизЛ Гражданство="RUS" ДатаРожд="08.02.1967" ИННФЛ="760000000000" СНИЛС="22222222222">
+				<ФИО Имя="Юрьевна" Отчество="Чеканова" Фамилия="Ольга"/>
+				<УдЛичн ВыдДок="Отделом УФМС России по Ярославской области в Дзержинском районе г. Ярославля" ДатаДок="11.11.2009" КодВидДок="21" КодВыдДок="768-292" СерНомДок="1122222333"/>
+			</СведФизЛ>
+		</СвУпПред>
+		<Подписант Имя="Михаил" Отчество="Николаевич" Фамилия="Чеканов"/>
+	</Документ>
+<ds:Signature xmlns:ds="http://www.w3.org/2000/09/xmldsig#" Id="xmldsig-2FB1B89F-7CC5-48B3-B85A-AE1E647C1EB9-sign"><ds:SignedInfo><ds:CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/><ds:SignatureMethod Algorithm="urn:ietf:params:xml:ns:cpxmlsec:algorithms:gostr34102012-gostr34112012-256"/><ds:Reference URI=""><ds:Transforms><ds:Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"/><ds:Transform Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/></ds:Transforms><ds:DigestMethod Algorithm="urn:ietf:params:xml:ns:cpxmlsec:algorithms:gostr34112012-256"/><ds:DigestValue>Vqwc+mPwXMGXxWH9OClKFL0UzTsLsp7Irj3O6owcNY8=</ds:DigestValue></ds:Reference><ds:Reference Type="http://uri.etsi.org/01903#SignedProperties" URI="#xmldsig-2FB1B89F-7CC5-48B3-B85A-AE1E647C1EB9-signedprops"><ds:Transforms><ds:Transform Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/></ds:Transforms><ds:DigestMethod Algorithm="urn:ietf:params:xml:ns:cpxmlsec:algorithms:gostr34112012-256"/><ds:DigestValue>4Kjgf3Oa0z5D4xFNEcG8EWvJ/UrUxelFMaDDl1GRync=</ds:DigestValue></ds:Reference></ds:SignedInfo><ds:SignatureValue>TalU3jz7CGDHdHrqXpQY6/nYLUalAd16EAzJI/rLpmN4KFuYS2gQN9qfV1h7/NdoGsBTPWA/qFNvDaXXWSKOLA==</ds:SignatureValue><ds:KeyInfo><ds:X509Data><ds:X509Certificate>MIIBwTCCAWwCFG2w5A3o8apErSl2EveA9A3tM2l/MAwGCCqFAwcBAQMCBQAwajEL
+MAkGA1UEBhMCUlUxDzANBgNVBAgMBlJ1c3NpYTEPMA0GA1UEBwwGTW9zY293MRYw
+FAYDVQQKDA1oeXBlcnRlc3QuY29tMSEwHwYDVQQDDBh0bHNjYS5vcmcxLmh5cGVy
+dGVzdC5jb20wHhcNMjEwMzIyMTU0NzI1WhcNMzEwMzIwMTU0NzI1WjBSMQswCQYD
+VQQGEwJSVTEPMA0GA1UECAwGUnVzc2lhMQ8wDQYDVQQHDAZNb3Njb3cxITAfBgNV
+BAMMGFRMUy5DTElFTlRAaHlwZXJ0ZXN0LmNvbTBmMB8GCCqFAwcBAQEBMBMGByqF
+AwICIwEGCCqFAwcBAQICA0MABEDDpEF9eAzcB4lQrH4awqQI9/+naWpfZ3JQYeZ+
+ceXdnpKLkue+gMak8ytYy1k80G9F/tVdK4nV7Byebl2J3UUmMAwGCCqFAwcBAQMC
+BQADQQAL8EisY9zbQ9WbQqgBJDWDDt0Jv3616tf4hpyIVrCno00BB8kh98nMGr9n
+zpyyLKNndWX1rNQKQZTXql2BFQS7
+</ds:X509Certificate></ds:X509Data></ds:KeyInfo><ds:Object><xades:QualifyingProperties xmlns:xades="http://uri.etsi.org/01903/v1.3.2#" Target="#xmldsig-2FB1B89F-7CC5-48B3-B85A-AE1E647C1EB9-sign"><xades:SignedProperties Id="xmldsig-2FB1B89F-7CC5-48B3-B85A-AE1E647C1EB9-signedprops"><xades:SignedSignatureProperties><xades:SigningTime>2021-11-02T17:56:00+03:00</xades:SigningTime><xades:SigningCertificate><xades:Cert><xades:CertDigest><ds:DigestMethod Algorithm="urn:ietf:params:xml:ns:cpxmlsec:algorithms:gostr34112012-256"/><ds:DigestValue>gvjRAJXzayYNy/O9uNT7V2XIBVLmkQN2YftnEUowZcM=</ds:DigestValue></xades:CertDigest><xades:IssuerSerial><ds:X509IssuerName>C=RU,ST=Russia,L=Moscow,O=hypertest.com,CN=tlsca.org1.hypertest.com</ds:X509IssuerName><ds:X509SerialNumber>626224791509238801138504502341846371637468031359</ds:X509SerialNumber></xades:IssuerSerial></xades:Cert></xades:SigningCertificate></xades:SignedSignatureProperties></xades:SignedProperties></xades:QualifyingProperties></ds:Object></ds:Signature></Файл>

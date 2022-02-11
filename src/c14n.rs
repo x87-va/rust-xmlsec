@@ -1,7 +1,8 @@
 use std::borrow::Cow;
 use std::cmp;
 
-use xml::reader::XmlEvent;
+use xml::reader;
+use xml::writer;
 
 fn canon_attr_map<'a>(a: &'a xml::attribute::OwnedAttribute) -> (xml::name::Name<'a>, String) {
     let attribute_re = regex::Regex::new(r"[ \r\n\t]").unwrap();
@@ -18,14 +19,14 @@ fn canon_attr_map<'a>(a: &'a xml::attribute::OwnedAttribute) -> (xml::name::Name
 }
 
 pub fn canonical_rfc3076(
-    events: &[xml::reader::XmlEvent],
+    events: &[reader::XmlEvent],
     include_comments: bool,
     offset: usize,
     exclusive: bool,
 ) -> Result<String, String> {
     let mut output = Vec::new();
 
-    let emitter_config = xml::writer::EmitterConfig {
+    let emitter_config = writer::EmitterConfig {
         perform_indent: false,
         perform_escaping: false,
         write_document_declaration: false,
@@ -36,7 +37,7 @@ pub fn canonical_rfc3076(
         ..Default::default()
     };
 
-    let mut output_writer = xml::writer::EventWriter::new_with_config(&mut output, emitter_config);
+    let mut output_writer = writer::EventWriter::new_with_config(&mut output, emitter_config);
 
     let mut level: usize = 0;
     let mut xml_ns_attrs = vec![];
@@ -44,11 +45,11 @@ pub fn canonical_rfc3076(
 
     for (i, event) in events.iter().enumerate() {
         let result = match event {
-            XmlEvent::StartDocument { .. } => Ok(()),
-            XmlEvent::EndDocument { .. } => Ok(()),
-            XmlEvent::ProcessingInstruction { name, data } => {
+            reader::XmlEvent::StartDocument { .. } => Ok(()),
+            reader::XmlEvent::EndDocument { .. } => Ok(()),
+            reader::XmlEvent::ProcessingInstruction { name, data } => {
                 if i >= offset {
-                    output_writer.write(xml::writer::XmlEvent::ProcessingInstruction {
+                    output_writer.write(writer::XmlEvent::ProcessingInstruction {
                         name,
                         data: data.as_deref(),
                     })
@@ -56,7 +57,7 @@ pub fn canonical_rfc3076(
                     Ok(())
                 }
             }
-            XmlEvent::StartElement {
+            reader::XmlEvent::StartElement {
                 name,
                 attributes,
                 namespace,
@@ -136,7 +137,7 @@ pub fn canonical_rfc3076(
                         (Some(_), None) => cmp::Ordering::Greater,
                     });
 
-                    output_writer.write(xml::writer::XmlEvent::StartElement {
+                    output_writer.write(writer::XmlEvent::StartElement {
                         name: name.borrow(),
                         attributes: mapped_attr
                             .iter()
@@ -155,7 +156,7 @@ pub fn canonical_rfc3076(
                     Ok(())
                 }
             }
-            XmlEvent::EndElement { name } => {
+            reader::XmlEvent::EndElement { name } => {
                 xml_ns_attrs.pop();
 
                 if i >= offset {
@@ -163,7 +164,7 @@ pub fn canonical_rfc3076(
 
                     exc_ns_stack.try_pop();
 
-                    match output_writer.write(xml::writer::XmlEvent::EndElement {
+                    match output_writer.write(writer::XmlEvent::EndElement {
                         name: Some(name.borrow()),
                     }) {
                         Ok(_) => {
@@ -172,15 +173,15 @@ pub fn canonical_rfc3076(
                             }
                             Ok(())
                         }
-                        Err(e) => Err(e),
+                        error => error,
                     }
                 } else {
                     Ok(())
                 }
             }
-            XmlEvent::CData(data) => {
+            reader::XmlEvent::CData(data) => {
                 if i >= offset {
-                    output_writer.write(xml::writer::XmlEvent::Characters(
+                    output_writer.write(writer::XmlEvent::Characters(
                         &data
                             .replace("\r\n", "\n")
                             .replace("&", "&amp;")
@@ -192,29 +193,23 @@ pub fn canonical_rfc3076(
                     Ok(())
                 }
             }
-            XmlEvent::Comment(data) => {
-                println!("{} Comment({})", i, data);
-
+            reader::XmlEvent::Comment(data) => {
                 if i >= offset && include_comments {
-                    output_writer.write(xml::writer::XmlEvent::Comment(&data.replace("\r\n", "\n")))
+                    output_writer.write(writer::XmlEvent::Comment(&data.replace("\r\n", "\n")))
                 } else {
                     Ok(())
                 }
             }
-            XmlEvent::Whitespace(data) => {
-                println!("{} Whitespace({})", i, data);
-
+            reader::XmlEvent::Whitespace(data) => {
                 if i >= offset {
-                    output_writer.write(xml::writer::XmlEvent::Characters(data))
+                    output_writer.write(writer::XmlEvent::Characters(data))
                 } else {
                     Ok(())
                 }
             }
-            XmlEvent::Characters(data) => {
-                println!("{} Characters({})", i, data);
-
+            reader::XmlEvent::Characters(data) => {
                 if i >= offset {
-                    output_writer.write(xml::writer::XmlEvent::Characters(
+                    output_writer.write(writer::XmlEvent::Characters(
                         &data
                             .replace("\r\n", "\n")
                             .replace("&", "&amp;")
@@ -230,7 +225,7 @@ pub fn canonical_rfc3076(
 
         match result {
             Ok(_) => {}
-            Err(e) => return Err(e.to_string()),
+            Err(error) => return Err(error.to_string()),
         }
     }
 
@@ -253,11 +248,10 @@ mod tests {
             .coalesce_characters(false)
             .ignore_root_level_whitespace(true);
 
-        let reader =
-            xml::reader::EventReader::new_with_config(source_xml.as_bytes(), parser_config)
-                .into_iter()
-                .collect::<Result<Vec<_>, _>>()
-                .unwrap();
+        let reader = reader::EventReader::new_with_config(source_xml.as_bytes(), parser_config)
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
 
         let canon = canonical_rfc3076(&reader, false, 0, false).unwrap();
         assert_eq!(canon, canon_xml);
@@ -274,11 +268,10 @@ mod tests {
             .coalesce_characters(false)
             .ignore_root_level_whitespace(true);
 
-        let reader =
-            xml::reader::EventReader::new_with_config(source_xml.as_bytes(), parser_config)
-                .into_iter()
-                .collect::<Result<Vec<_>, _>>()
-                .unwrap();
+        let reader = reader::EventReader::new_with_config(source_xml.as_bytes(), parser_config)
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
 
         let canon = canonical_rfc3076(&reader, false, 0, false).unwrap();
         assert_eq!(canon, canon_xml);
@@ -296,11 +289,10 @@ mod tests {
             .coalesce_characters(false)
             .ignore_root_level_whitespace(true);
 
-        let reader =
-            xml::reader::EventReader::new_with_config(source_xml.as_bytes(), parser_config)
-                .into_iter()
-                .collect::<Result<Vec<_>, _>>()
-                .unwrap();
+        let reader = reader::EventReader::new_with_config(source_xml.as_bytes(), parser_config)
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
 
         let canon = canonical_rfc3076(&reader, false, 0, false).unwrap();
         assert_eq!(canon, canon_xml);
@@ -318,11 +310,10 @@ mod tests {
             .coalesce_characters(false)
             .ignore_root_level_whitespace(true);
 
-        let reader =
-            xml::reader::EventReader::new_with_config(source_xml.as_bytes(), parser_config)
-                .into_iter()
-                .collect::<Result<Vec<_>, _>>()
-                .unwrap();
+        let reader = reader::EventReader::new_with_config(source_xml.as_bytes(), parser_config)
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
 
         let canon = canonical_rfc3076(&reader, false, 0, false).unwrap();
         assert_eq!(canon, canon_xml);
@@ -339,11 +330,10 @@ mod tests {
             .coalesce_characters(false)
             .ignore_root_level_whitespace(true);
 
-        let reader =
-            xml::reader::EventReader::new_with_config(source_xml.as_bytes(), parser_config)
-                .into_iter()
-                .collect::<Result<Vec<_>, _>>()
-                .unwrap();
+        let reader = reader::EventReader::new_with_config(source_xml.as_bytes(), parser_config)
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
 
         let canon = canonical_rfc3076(&reader, false, 0, false).unwrap();
         assert_eq!(canon, canon_xml);
@@ -375,15 +365,14 @@ mod tests {
             .coalesce_characters(false)
             .ignore_root_level_whitespace(true);
 
-        let reader =
-            xml::reader::EventReader::new_with_config(source_xml.as_bytes(), parser_config)
-                .into_iter()
-                .collect::<Result<Vec<_>, _>>()
-                .unwrap();
+        let reader = reader::EventReader::new_with_config(source_xml.as_bytes(), parser_config)
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
 
         let mut i = 0;
         for evt in &reader {
-            if let XmlEvent::StartElement { name, .. } = evt {
+            if let reader::XmlEvent::StartElement { name, .. } = evt {
                 if name.local_name == "Doc" {
                     break;
                 }
@@ -416,15 +405,14 @@ mod tests {
             .coalesce_characters(false)
             .ignore_root_level_whitespace(true);
 
-        let reader =
-            xml::reader::EventReader::new_with_config(source_xml.as_bytes(), parser_config)
-                .into_iter()
-                .collect::<Result<Vec<_>, _>>()
-                .unwrap();
+        let reader = reader::EventReader::new_with_config(source_xml.as_bytes(), parser_config)
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
 
         let mut i = 0;
         for evt in &reader {
-            if let XmlEvent::StartElement { name, .. } = evt {
+            if let reader::XmlEvent::StartElement { name, .. } = evt {
                 if name.local_name == "elem2" {
                     break;
                 }
@@ -459,15 +447,14 @@ mod tests {
             .coalesce_characters(false)
             .ignore_root_level_whitespace(true);
 
-        let reader =
-            xml::reader::EventReader::new_with_config(source_xml.as_bytes(), parser_config)
-                .into_iter()
-                .collect::<Result<Vec<_>, _>>()
-                .unwrap();
+        let reader = reader::EventReader::new_with_config(source_xml.as_bytes(), parser_config)
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
 
         let mut i = 0;
         for evt in &reader {
-            if let XmlEvent::StartElement { name, .. } = evt {
+            if let reader::XmlEvent::StartElement { name, .. } = evt {
                 if name.local_name == "elem2" {
                     break;
                 }
@@ -499,15 +486,14 @@ mod tests {
             .coalesce_characters(false)
             .ignore_root_level_whitespace(true);
 
-        let reader =
-            xml::reader::EventReader::new_with_config(source_xml.as_bytes(), parser_config)
-                .into_iter()
-                .collect::<Result<Vec<_>, _>>()
-                .unwrap();
+        let reader = reader::EventReader::new_with_config(source_xml.as_bytes(), parser_config)
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
 
         let mut i = 0;
         for evt in &reader {
-            if let XmlEvent::StartElement { name, .. } = evt {
+            if let reader::XmlEvent::StartElement { name, .. } = evt {
                 if name.local_name == "elem2" {
                     break;
                 }
@@ -542,15 +528,14 @@ mod tests {
             .coalesce_characters(false)
             .ignore_root_level_whitespace(true);
 
-        let reader =
-            xml::reader::EventReader::new_with_config(source_xml.as_bytes(), parser_config)
-                .into_iter()
-                .collect::<Result<Vec<_>, _>>()
-                .unwrap();
+        let reader = reader::EventReader::new_with_config(source_xml.as_bytes(), parser_config)
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
 
         let mut i = 0;
         for evt in &reader {
-            if let XmlEvent::StartElement { name, .. } = evt {
+            if let reader::XmlEvent::StartElement { name, .. } = evt {
                 if name.local_name == "elem2" {
                     break;
                 }
