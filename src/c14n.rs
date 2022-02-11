@@ -1,3 +1,7 @@
+use std::borrow::Cow;
+
+use xml::reader::XmlEvent;
+
 fn canon_attr_map<'a>(a: &'a xml::attribute::OwnedAttribute) -> (xml::name::Name<'a>, String) {
     let attribute_re = regex::Regex::new(r"[ \r\n\t]").unwrap();
 
@@ -27,7 +31,7 @@ pub fn canonical_rfc3076(
             write_document_declaration: false,
             autopad_comments: false,
             cdata_to_characters: true,
-            line_separator: std::borrow::Cow::Borrowed("\n"),
+            line_separator: Cow::Borrowed("\n"),
             normalize_empty_elements: false,
             ..std::default::Default::default()
         },
@@ -38,9 +42,9 @@ pub fn canonical_rfc3076(
     let mut exc_ns_stack = xml::namespace::NamespaceStack::default();
     for (i, event) in events.iter().enumerate() {
         match match event {
-            xml::reader::XmlEvent::StartDocument { .. } => Ok(()),
-            xml::reader::XmlEvent::EndDocument { .. } => Ok(()),
-            xml::reader::XmlEvent::ProcessingInstruction { name, data } => {
+            XmlEvent::StartDocument { .. } => Ok(()),
+            XmlEvent::EndDocument { .. } => Ok(()),
+            XmlEvent::ProcessingInstruction { name, data } => {
                 if i >= offset {
                     output_writer.write(xml::writer::XmlEvent::ProcessingInstruction {
                         name,
@@ -50,7 +54,7 @@ pub fn canonical_rfc3076(
                     Ok(())
                 }
             }
-            xml::reader::XmlEvent::StartElement {
+            XmlEvent::StartElement {
                 name,
                 attributes,
                 namespace,
@@ -135,16 +139,16 @@ pub fn canonical_rfc3076(
                             })
                             .collect(),
                         namespace: if exclusive {
-                            std::borrow::Cow::Owned(exc_ns_stack.squash())
+                            Cow::Owned(exc_ns_stack.squash())
                         } else {
-                            std::borrow::Cow::Borrowed(&namespace)
+                            Cow::Borrowed(&namespace)
                         },
                     })
                 } else {
                     Ok(())
                 }
             }
-            xml::reader::XmlEvent::EndElement { name } => {
+            XmlEvent::EndElement { name } => {
                 xml_ns_attrs.pop();
 
                 if i >= offset {
@@ -167,7 +171,7 @@ pub fn canonical_rfc3076(
                     Ok(())
                 }
             }
-            xml::reader::XmlEvent::CData(data) => {
+            XmlEvent::CData(data) => {
                 if i >= offset {
                     output_writer.write(xml::writer::XmlEvent::Characters(
                         &data
@@ -181,14 +185,14 @@ pub fn canonical_rfc3076(
                     Ok(())
                 }
             }
-            xml::reader::XmlEvent::Comment(data) => {
+            XmlEvent::Comment(data) => {
                 if i >= offset && include_comments {
                     output_writer.write(xml::writer::XmlEvent::Comment(&data.replace("\r\n", "\n")))
                 } else {
                     Ok(())
                 }
             }
-            xml::reader::XmlEvent::Whitespace(data) => {
+            XmlEvent::Whitespace(data) => {
                 if i >= offset && include_comments {
                     output_writer.write(xml::writer::XmlEvent::Characters(
                         &data.replace("\r\n", "\n"),
@@ -197,7 +201,7 @@ pub fn canonical_rfc3076(
                     Ok(())
                 }
             }
-            xml::reader::XmlEvent::Characters(data) => {
+            XmlEvent::Characters(data) => {
                 if i >= offset {
                     output_writer.write(xml::writer::XmlEvent::Characters(
                         &data
@@ -222,38 +226,38 @@ pub fn canonical_rfc3076(
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
     #[test]
     fn c14n_1() {
         let source_xml = r#"
-<?xml version="1.0" encoding="ISO-8859-1"?>
-
-<Envelope>
-<!-- some comment -->
-  <Body>
-    Olá mundo
-  </Body>
-
-</Envelope>
-"#;
+        <?xml version="1.0" encoding="ISO-8859-1"?>
+        <Envelope>
+        <!-- some comment -->
+          <Body>
+            Olá mundo
+          </Body>
+        </Envelope>
+        "#;
         let canon_xml = r#"<Envelope>
+          <Body>
+            Olá mundo
+          </Body>
+        </Envelope>"#;
 
-  <Body>
-    Olá mundo
-  </Body>
+        let parser_config = xml::ParserConfig::new()
+            .ignore_comments(false)
+            .trim_whitespace(false)
+            .coalesce_characters(false)
+            .ignore_root_level_whitespace(true);
 
-</Envelope>"#;
-        let reader = xml::reader::EventReader::new_with_config(
-            source_xml.as_bytes(),
-            xml::ParserConfig::new()
-                .ignore_comments(false)
-                .trim_whitespace(false)
-                .coalesce_characters(false)
-                .ignore_root_level_whitespace(true),
-        )
-        .into_iter()
-        .collect::<Result<Vec<_>, _>>()
-        .unwrap();
-        let canon = super::canonical_rfc3076(&reader, false, 0, false).unwrap();
+        let reader =
+            xml::reader::EventReader::new_with_config(source_xml.as_bytes(), parser_config)
+                .into_iter()
+                .collect::<Result<Vec<_>, _>>()
+                .unwrap();
+
+        let canon = canonical_rfc3076(&reader, false, 0, false).unwrap();
         assert_eq!(canon, canon_xml);
     }
 
@@ -261,18 +265,20 @@ mod tests {
     fn c14n_2() {
         let source_xml = r#"<DigestMethod Algorithm="http:...#sha1" />"#;
         let canon_xml = r#"<DigestMethod Algorithm="http:...#sha1"></DigestMethod>"#;
-        let reader = xml::reader::EventReader::new_with_config(
-            source_xml.as_bytes(),
-            xml::ParserConfig::new()
-                .ignore_comments(false)
-                .trim_whitespace(false)
-                .coalesce_characters(false)
-                .ignore_root_level_whitespace(true),
-        )
-        .into_iter()
-        .collect::<Result<Vec<_>, _>>()
-        .unwrap();
-        let canon = super::canonical_rfc3076(&reader, false, 0, false).unwrap();
+
+        let parser_config = xml::ParserConfig::new()
+            .ignore_comments(false)
+            .trim_whitespace(false)
+            .coalesce_characters(false)
+            .ignore_root_level_whitespace(true);
+
+        let reader =
+            xml::reader::EventReader::new_with_config(source_xml.as_bytes(), parser_config)
+                .into_iter()
+                .collect::<Result<Vec<_>, _>>()
+                .unwrap();
+
+        let canon = canonical_rfc3076(&reader, false, 0, false).unwrap();
         assert_eq!(canon, canon_xml);
     }
 
@@ -281,18 +287,20 @@ mod tests {
         let source_xml = r#"<e1   a='one'
   b  = 'two'  />"#;
         let canon_xml = r#"<e1 a="one" b="two"></e1>"#;
-        let reader = xml::reader::EventReader::new_with_config(
-            source_xml.as_bytes(),
-            xml::ParserConfig::new()
-                .ignore_comments(false)
-                .trim_whitespace(false)
-                .coalesce_characters(false)
-                .ignore_root_level_whitespace(true),
-        )
-        .into_iter()
-        .collect::<Result<Vec<_>, _>>()
-        .unwrap();
-        let canon = super::canonical_rfc3076(&reader, false, 0, false).unwrap();
+
+        let parser_config = xml::ParserConfig::new()
+            .ignore_comments(false)
+            .trim_whitespace(false)
+            .coalesce_characters(false)
+            .ignore_root_level_whitespace(true);
+
+        let reader =
+            xml::reader::EventReader::new_with_config(source_xml.as_bytes(), parser_config)
+                .into_iter()
+                .collect::<Result<Vec<_>, _>>()
+                .unwrap();
+
+        let canon = canonical_rfc3076(&reader, false, 0, false).unwrap();
         assert_eq!(canon, canon_xml);
     }
 
@@ -301,18 +309,20 @@ mod tests {
         let source_xml = r#"<e2 C=' letter
 	A ' />"#;
         let canon_xml = r#"<e2 C=" letter  A "></e2>"#;
-        let reader = xml::reader::EventReader::new_with_config(
-            source_xml.as_bytes(),
-            xml::ParserConfig::new()
-                .ignore_comments(false)
-                .trim_whitespace(false)
-                .coalesce_characters(false)
-                .ignore_root_level_whitespace(true),
-        )
-        .into_iter()
-        .collect::<Result<Vec<_>, _>>()
-        .unwrap();
-        let canon = super::canonical_rfc3076(&reader, false, 0, false).unwrap();
+
+        let parser_config = xml::ParserConfig::new()
+            .ignore_comments(false)
+            .trim_whitespace(false)
+            .coalesce_characters(false)
+            .ignore_root_level_whitespace(true);
+
+        let reader =
+            xml::reader::EventReader::new_with_config(source_xml.as_bytes(), parser_config)
+                .into_iter()
+                .collect::<Result<Vec<_>, _>>()
+                .unwrap();
+
+        let canon = canonical_rfc3076(&reader, false, 0, false).unwrap();
         assert_eq!(canon, canon_xml);
     }
 
@@ -320,18 +330,20 @@ mod tests {
     fn c14n_5() {
         let source_xml = r#"<e b:attr="sorted" xmlns:b="http://www.ietf.org" attr="I'm" attr2="all"  a:attr="out" a:attr2="now" xmlns="http://example.org" xmlns:a="http://www.w3.org" ></e>"#;
         let canon_xml = r#"<e xmlns="http://example.org" xmlns:a="http://www.w3.org" xmlns:b="http://www.ietf.org" attr="I'm" attr2="all" b:attr="sorted" a:attr="out" a:attr2="now"></e>"#;
-        let reader = xml::reader::EventReader::new_with_config(
-            source_xml.as_bytes(),
-            xml::ParserConfig::new()
-                .ignore_comments(false)
-                .trim_whitespace(false)
-                .coalesce_characters(false)
-                .ignore_root_level_whitespace(true),
-        )
-        .into_iter()
-        .collect::<Result<Vec<_>, _>>()
-        .unwrap();
-        let canon = super::canonical_rfc3076(&reader, false, 0, false).unwrap();
+
+        let parser_config = xml::ParserConfig::new()
+            .ignore_comments(false)
+            .trim_whitespace(false)
+            .coalesce_characters(false)
+            .ignore_root_level_whitespace(true);
+
+        let reader =
+            xml::reader::EventReader::new_with_config(source_xml.as_bytes(), parser_config)
+                .into_iter()
+                .collect::<Result<Vec<_>, _>>()
+                .unwrap();
+
+        let canon = canonical_rfc3076(&reader, false, 0, false).unwrap();
         assert_eq!(canon, canon_xml);
     }
 
@@ -354,29 +366,31 @@ mod tests {
         let canon_xml = r#"<Doc xmlns="http://www.example.com" xmlns:ab="http://www.ab.com" Id="P666">
     ...
     </Doc>"#;
-        let reader = xml::reader::EventReader::new_with_config(
-            source_xml.as_bytes(),
-            xml::ParserConfig::new()
-                .ignore_comments(false)
-                .trim_whitespace(false)
-                .coalesce_characters(false)
-                .ignore_root_level_whitespace(true),
-        )
-        .into_iter()
-        .collect::<Result<Vec<_>, _>>()
-        .unwrap();
+
+        let parser_config = xml::ParserConfig::new()
+            .ignore_comments(false)
+            .trim_whitespace(false)
+            .coalesce_characters(false)
+            .ignore_root_level_whitespace(true);
+
+        let reader =
+            xml::reader::EventReader::new_with_config(source_xml.as_bytes(), parser_config)
+                .into_iter()
+                .collect::<Result<Vec<_>, _>>()
+                .unwrap();
 
         let mut i = 0;
         for evt in &reader {
-            if let xml::reader::XmlEvent::StartElement { name, .. } = evt {
+            if let XmlEvent::StartElement { name, .. } = evt {
                 if name.local_name == "Doc" {
                     break;
                 }
             }
+
             i += 1;
         }
 
-        let canon = super::canonical_rfc3076(&reader, false, i, false).unwrap();
+        let canon = canonical_rfc3076(&reader, false, i, false).unwrap();
         assert_eq!(canon, canon_xml);
     }
 
@@ -393,21 +407,22 @@ mod tests {
         let canon_xml = r#"<n1:elem2 xmlns:n0="foo:bar" xmlns:n1="http://example.net" xmlns:n3="ftp://example.org" xml:lang="en">
              <n3:stuff></n3:stuff>
          </n1:elem2>"#;
-        let reader = xml::reader::EventReader::new_with_config(
-            source_xml.as_bytes(),
-            xml::ParserConfig::new()
-                .ignore_comments(false)
-                .trim_whitespace(false)
-                .coalesce_characters(false)
-                .ignore_root_level_whitespace(true),
-        )
-        .into_iter()
-        .collect::<Result<Vec<_>, _>>()
-        .unwrap();
+
+        let parser_config = xml::ParserConfig::new()
+            .ignore_comments(false)
+            .trim_whitespace(false)
+            .coalesce_characters(false)
+            .ignore_root_level_whitespace(true);
+
+        let reader =
+            xml::reader::EventReader::new_with_config(source_xml.as_bytes(), parser_config)
+                .into_iter()
+                .collect::<Result<Vec<_>, _>>()
+                .unwrap();
 
         let mut i = 0;
         for evt in &reader {
-            if let xml::reader::XmlEvent::StartElement { name, .. } = evt {
+            if let XmlEvent::StartElement { name, .. } = evt {
                 if name.local_name == "elem2" {
                     break;
                 }
@@ -415,7 +430,7 @@ mod tests {
             i += 1;
         }
 
-        let canon = super::canonical_rfc3076(&reader, false, i, false).unwrap();
+        let canon = canonical_rfc3076(&reader, false, i, false).unwrap();
         assert_eq!(canon, canon_xml);
     }
 
@@ -435,21 +450,22 @@ mod tests {
         let canon_xml = r#"<n1:elem2 xmlns:n1="http://example.net" xmlns:n2="http://foo.example" xml:lang="en" xml:space="retain">
              <n3:stuff xmlns:n3="ftp://example.org"></n3:stuff>
          </n1:elem2>"#;
-        let reader = xml::reader::EventReader::new_with_config(
-            source_xml.as_bytes(),
-            xml::ParserConfig::new()
-                .ignore_comments(false)
-                .trim_whitespace(false)
-                .coalesce_characters(false)
-                .ignore_root_level_whitespace(true),
-        )
-        .into_iter()
-        .collect::<Result<Vec<_>, _>>()
-        .unwrap();
+
+        let parser_config = xml::ParserConfig::new()
+            .ignore_comments(false)
+            .trim_whitespace(false)
+            .coalesce_characters(false)
+            .ignore_root_level_whitespace(true);
+
+        let reader =
+            xml::reader::EventReader::new_with_config(source_xml.as_bytes(), parser_config)
+                .into_iter()
+                .collect::<Result<Vec<_>, _>>()
+                .unwrap();
 
         let mut i = 0;
         for evt in &reader {
-            if let xml::reader::XmlEvent::StartElement { name, .. } = evt {
+            if let XmlEvent::StartElement { name, .. } = evt {
                 if name.local_name == "elem2" {
                     break;
                 }
@@ -457,7 +473,7 @@ mod tests {
             i += 1;
         }
 
-        let canon = super::canonical_rfc3076(&reader, false, i, false).unwrap();
+        let canon = canonical_rfc3076(&reader, false, i, false).unwrap();
         assert_eq!(canon, canon_xml);
     }
 
@@ -474,21 +490,22 @@ mod tests {
         let canon_xml = r#"<n1:elem2 xmlns:n1="http://example.net" xml:lang="en">
              <n3:stuff xmlns:n3="ftp://example.org"></n3:stuff>
          </n1:elem2>"#;
-        let reader = xml::reader::EventReader::new_with_config(
-            source_xml.as_bytes(),
-            xml::ParserConfig::new()
-                .ignore_comments(false)
-                .trim_whitespace(false)
-                .coalesce_characters(false)
-                .ignore_root_level_whitespace(true),
-        )
-        .into_iter()
-        .collect::<Result<Vec<_>, _>>()
-        .unwrap();
+
+        let parser_config = xml::ParserConfig::new()
+            .ignore_comments(false)
+            .trim_whitespace(false)
+            .coalesce_characters(false)
+            .ignore_root_level_whitespace(true);
+
+        let reader =
+            xml::reader::EventReader::new_with_config(source_xml.as_bytes(), parser_config)
+                .into_iter()
+                .collect::<Result<Vec<_>, _>>()
+                .unwrap();
 
         let mut i = 0;
         for evt in &reader {
-            if let xml::reader::XmlEvent::StartElement { name, .. } = evt {
+            if let XmlEvent::StartElement { name, .. } = evt {
                 if name.local_name == "elem2" {
                     break;
                 }
@@ -496,7 +513,7 @@ mod tests {
             i += 1;
         }
 
-        let canon = super::canonical_rfc3076(&reader, false, i, true).unwrap();
+        let canon = canonical_rfc3076(&reader, false, i, true).unwrap();
         assert_eq!(canon, canon_xml);
     }
 
@@ -516,29 +533,31 @@ mod tests {
         let canon_xml = r#"<n1:elem2 xmlns:n1="http://example.net" xml:lang="en">
              <n3:stuff xmlns:n3="ftp://example.org"></n3:stuff>
          </n1:elem2>"#;
-        let reader = xml::reader::EventReader::new_with_config(
-            source_xml.as_bytes(),
-            xml::ParserConfig::new()
-                .ignore_comments(false)
-                .trim_whitespace(false)
-                .coalesce_characters(false)
-                .ignore_root_level_whitespace(true),
-        )
-        .into_iter()
-        .collect::<Result<Vec<_>, _>>()
-        .unwrap();
+
+        let parser_config = xml::ParserConfig::new()
+            .ignore_comments(false)
+            .trim_whitespace(false)
+            .coalesce_characters(false)
+            .ignore_root_level_whitespace(true);
+
+        let reader =
+            xml::reader::EventReader::new_with_config(source_xml.as_bytes(), parser_config)
+                .into_iter()
+                .collect::<Result<Vec<_>, _>>()
+                .unwrap();
 
         let mut i = 0;
         for evt in &reader {
-            if let xml::reader::XmlEvent::StartElement { name, .. } = evt {
+            if let XmlEvent::StartElement { name, .. } = evt {
                 if name.local_name == "elem2" {
                     break;
                 }
             }
+
             i += 1;
         }
 
-        let canon = super::canonical_rfc3076(&reader, false, i, true).unwrap();
+        let canon = canonical_rfc3076(&reader, false, i, true).unwrap();
         assert_eq!(canon, canon_xml);
     }
 }

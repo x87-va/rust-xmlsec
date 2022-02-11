@@ -355,6 +355,11 @@ pub const DIGEST_SH224: &'static str = "http://www.w3.org/2001/04/xmldsig-more#s
 pub const DIGEST_SHA384: &'static str = "http://www.w3.org/2001/04/xmldsig-more#sha384";
 pub const DIGEST_SHA512: &'static str = "http://www.w3.org/2001/04/xmlenc#sha512";
 
+pub const DIGEST_GOST256: &'static str =
+    "urn:ietf:params:xml:ns:cpxmlsec:algorithms:gostr34112012-256";
+pub const DIGEST_GOST512: &'static str =
+    "urn:ietf:params:xml:ns:cpxmlsec:algorithms:gostr34112012-512";
+
 pub const TRANSFORM_ENVELOPED_SIGNATURE: &'static str =
     "http://www.w3.org/2000/09/xmldsig#enveloped-signature";
 
@@ -389,6 +394,10 @@ pub const SIGNATURE_ECDSA_RIPEMD160: &'static str =
     "http://www.w3.org/2001/04/xmldsig-more#ecdsa-ripemd160";
 pub const SIGNATURE_DSA_SHA1: &'static str = "http://www.w3.org/2000/09/xmldsig#dsa-sha1";
 pub const SIGNATURE_DSA_SHA256: &'static str = "http://www.w3.org/2009/xmldsig11#dsa-sha256";
+pub const SIGNATURE_GOST_256: &'static str =
+    "urn:ietf:params:xml:ns:cpxmlsec:algorithms:gostr34102012-gostr34112012-256";
+pub const SIGNATURE_GOST_512: &'static str =
+    "urn:ietf:params:xml:ns:cpxmlsec:algorithms:gostr34102012-gostr34112012-512";
 
 fn apply_transforms<'a>(
     reference: &proto::ds::Reference,
@@ -431,15 +440,23 @@ fn apply_transforms<'a>(
     })
 }
 
-fn map_digest(dm: &proto::ds::DigestMethod) -> Result<openssl::hash::MessageDigest, String> {
-    match dm.algorithm.as_str() {
+fn map_digest(method: &proto::ds::DigestMethod) -> Result<openssl::hash::MessageDigest, String> {
+    match method.algorithm.as_str() {
         DIGEST_SHA1 => Ok(openssl::hash::MessageDigest::sha1()),
         DIGEST_SHA256 => Ok(openssl::hash::MessageDigest::sha256()),
         DIGEST_SH224 => Ok(openssl::hash::MessageDigest::sha224()),
         DIGEST_SHA384 => Ok(openssl::hash::MessageDigest::sha384()),
         DIGEST_SHA512 => Ok(openssl::hash::MessageDigest::sha512()),
-        u => {
-            return Err(format!("unsupported digest: {}", u));
+        DIGEST_GOST256 => Ok(openssl::hash::MessageDigest::from_nid(
+            openssl::nid::Nid::ID_GOSTR3411_2012_256,
+        )
+        .unwrap()),
+        DIGEST_GOST512 => Ok(openssl::hash::MessageDigest::from_nid(
+            openssl::nid::Nid::ID_GOSTR3411_2012_512,
+        )
+        .unwrap()),
+        unsupported => {
+            return Err(format!("unsupported digest: {}", unsupported));
         }
     }
 }
@@ -447,10 +464,10 @@ fn map_digest(dm: &proto::ds::DigestMethod) -> Result<openssl::hash::MessageDige
 fn verify_signature(
     sm: &proto::ds::SignatureMethod,
     pkey: &openssl::pkey::PKeyRef<openssl::pkey::Public>,
-    sig: &[u8],
+    signature: &[u8],
     data: &[u8],
 ) -> bool {
-    let dm = match sm.algorithm.as_str() {
+    let md = match sm.algorithm.as_str() {
         SIGNATURE_RSA_MD5 => {
             if pkey.rsa().is_err() {
                 return false;
@@ -541,15 +558,29 @@ fn verify_signature(
             }
             openssl::hash::MessageDigest::sha256()
         }
+        SIGNATURE_GOST_256 => {
+            if pkey.id() != openssl::pkey::Id::GOST3410_2012_256 {
+                return false;
+            }
+            openssl::hash::MessageDigest::from_nid(openssl::nid::Nid::ID_GOSTR3411_2012_256)
+                .unwrap()
+        }
+        SIGNATURE_GOST_512 => {
+            if pkey.id() != openssl::pkey::Id::GOST3410_2012_512 {
+                return false;
+            }
+            openssl::hash::MessageDigest::from_nid(openssl::nid::Nid::ID_GOSTR3411_2012_512)
+                .unwrap()
+        }
         _ => return false,
     };
 
-    let mut verifier = match openssl::sign::Verifier::new(dm, pkey) {
+    let mut verifier = match openssl::sign::Verifier::new(md, pkey) {
         Ok(v) => v,
         Err(_) => return false,
     };
 
-    match verifier.verify_oneshot(sig, data) {
+    match verifier.verify_oneshot(signature, data) {
         Ok(v) => v,
         Err(_) => false,
     }
@@ -618,6 +649,7 @@ pub fn decode_and_verify_signed_document(source_xml: &str) -> Result<Output, Str
         .iter()
         .map(|e| xml::reader::Result::Ok(e.to_owned()))
         .collect::<Vec<_>>();
+
     let sig: proto::ds::OuterSignatre = match xml_serde::from_events(sig_elems.as_slice()) {
         Ok(s) => s,
         Err(e) => return Err(format!("unable to decode XML signature: {}", e)),
@@ -626,33 +658,34 @@ pub fn decode_and_verify_signed_document(source_xml: &str) -> Result<Output, Str
     let mut verified_outputs = vec![];
 
     for reference in &sig.signature.signed_info.reference {
-        let u = reference.uri.as_deref().unwrap_or_default();
-        let signed_data = apply_transforms(
-            reference,
-            AlgorithmData::NodeSet(if u == "" {
-                reader.as_slice()
-            } else if u.starts_with("#") {
-                match find_events_slice_by_id(&reader, &u[1..]) {
-                    Some(e) => e,
-                    None => return Err(format!("unable to find signed element: {}", u)),
-                }
-            } else {
-                return Err(format!("unsupported reference URI: {}", u));
-            }),
-        )?;
+        let uri = reference.uri.as_deref().unwrap_or_default();
+
+        let data = if uri == "" {
+            reader.as_slice()
+        } else if uri.starts_with("#") {
+            match find_events_slice_by_id(&reader, &uri[1..]) {
+                Some(e) => e,
+                None => return Err(format!("unable to find signed element: {}", uri)),
+            }
+        } else {
+            return Err(format!("unsupported reference URI: {}", uri));
+        };
+
+        let signed_data = apply_transforms(reference, AlgorithmData::NodeSet(data))?;
 
         let provided_digest = match base64::decode(&reference.digest_value) {
-            Ok(d) => d,
-            Err(e) => {
-                return Err(format!("invalid disest base64: {}", e));
+            Ok(value) => value,
+            Err(error) => {
+                return Err(format!("invalid disest base64: {}", error));
             }
         };
 
-        let dm = map_digest(&reference.digest_method)?;
-        let digest = match openssl::hash::hash(dm, signed_data.as_bytes()) {
-            Ok(d) => d,
-            Err(e) => {
-                return Err(format!("openssl error: {}", e));
+        let md = map_digest(&reference.digest_method)?;
+
+        let digest = match openssl::hash::hash(md, signed_data.as_bytes()) {
+            Ok(value) => value,
+            Err(error) => {
+                return Err(format!("openssl error: {}", error));
             }
         };
 
@@ -681,7 +714,12 @@ pub fn decode_and_verify_signed_document(source_xml: &str) -> Result<Output, Str
         CANONICAL_EXCLUSIVE_1_0_COMMENTS => {
             transform_exclusive_canonical_xml_1_0_with_comments(signed_info_events)?
         }
-        unsupported => return Err(format!("unsupported canonicalisation method: {}", unsupported)),
+        unsupported => {
+            return Err(format!(
+                "unsupported canonicalisation method: {}",
+                unsupported
+            ))
+        }
     };
 
     let signed_info_data = match canon_method.into_inner_data() {
@@ -871,6 +909,7 @@ pub fn sign_document(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
 
     #[test]
     fn sig_1() {
@@ -898,6 +937,27 @@ kO9N4axmKDI4W6XWtxTRifLySfnklNqn20MEF1PstW18lwkKCAninmVorqil5MKoXKjuFrBJv06u
 3JTAEGYtBo4aAIrQFJlAIEUV4H0jbYAKo+drHEA86yqE</ds:X509Certificate></ds:X509Data></ds:KeyInfo></ds:Signature><saml2p:Status><saml2p:StatusCode Value="urn:oasis:names:tc:SAML:2.0:status:Success"/></saml2p:Status><saml2:Assertion xmlns:saml2="urn:oasis:names:tc:SAML:2.0:assertion" ID="_3381066a8dfd537274b2f43fea8bec4c" IssueInstant="2021-07-29T12:34:42.465Z" Version="2.0"><saml2:Issuer>https://accounts.google.com/o/saml2?idpid=C01n8o8t6</saml2:Issuer><saml2:Subject><saml2:NameID Format="urn:oasis:names:tc:SAML:2.0:nameid-format:persistent">q@as207960.net</saml2:NameID><saml2:SubjectConfirmation Method="urn:oasis:names:tc:SAML:2.0:cm:bearer"><saml2:SubjectConfirmationData InResponseTo="test" NotOnOrAfter="2021-07-29T12:39:42.465Z" Recipient="https://as207960-neptune.eu.ngrok.io/saml2/assertion_consumer"/></saml2:SubjectConfirmation></saml2:Subject><saml2:Conditions NotBefore="2021-07-29T12:29:42.465Z" NotOnOrAfter="2021-07-29T12:39:42.465Z"><saml2:AudienceRestriction><saml2:Audience>https://neptune.as207960.net/entity</saml2:Audience></saml2:AudienceRestriction></saml2:Conditions><saml2:AuthnStatement AuthnInstant="2021-07-28T21:51:07.000Z" SessionIndex="_3381066a8dfd537274b2f43fea8bec4c"><saml2:AuthnContext><saml2:AuthnContextClassRef>urn:oasis:names:tc:SAML:2.0:ac:classes:unspecified</saml2:AuthnContextClassRef></saml2:AuthnContext></saml2:AuthnStatement></saml2:Assertion></saml2p:Response>"##;
 
         let output = super::decode_and_verify_signed_document(source_xml).unwrap();
+        println!("{:#?}", output);
+
+        if let Output::Verified {
+            references,
+            pkey: _,
+        } = output
+        {
+            assert_eq!(references.len(), 1);
+        }
+    }
+
+    #[test]
+    fn test_verify_file() {
+        pretty_env_logger::init();
+
+        let _engine = openssl_gost_engine::Engine::new().expect("Init GOST Engine");
+
+        let source_xml = fs::read_to_string("testdata/signed.xml").expect("Read signed XML file");
+
+        let output =
+            super::decode_and_verify_signed_document(&source_xml).expect("Verify signed XML file");
         println!("{:#?}", output);
 
         if let Output::Verified {

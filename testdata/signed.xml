@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no" ?><PurchaseOrder>
+	<Item number="130046593231">
+		<Description>Видео Игра</Description>
+		<Price>300.29</Price>
+	</Item>
+	<Buyer Id="8492340">
+		<Name>Иван Петров</Name>
+		<Address>
+			<Street>Большая Комитетская</Street>
+			<Town>Юбилейный</Town>
+			<State>МО</State>
+			<Country>Российская Федерация</Country>
+			<PostalCode>141090</PostalCode>
+		</Address>
+	</Buyer>
+<ds:Signature xmlns:ds="http://www.w3.org/2000/09/xmldsig#"><ds:SignedInfo><ds:CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/><ds:SignatureMethod Algorithm="urn:ietf:params:xml:ns:cpxmlsec:algorithms:gostr34102012-gostr34112012-256"/><ds:Reference URI=""><ds:Transforms><ds:Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"/><ds:Transform Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/></ds:Transforms><ds:DigestMethod Algorithm="urn:ietf:params:xml:ns:cpxmlsec:algorithms:gostr34112012-256"/><ds:DigestValue>tTiVS8DWjfyt6ezwZDI/2QtNbo33MD3kD0JlcANQThc=</ds:DigestValue></ds:Reference></ds:SignedInfo><ds:SignatureValue>BofdDBc78aXMIrKL/kOHcVOqOo09x5oDb7sgwOMc/a9Md4n4mfDz/XMGFrPv3HibCjqhzaCkMlALkK9dGN8jAw==</ds:SignatureValue><ds:KeyInfo><ds:X509Data><ds:X509Certificate>MIIBwTCCAWwCFG2w5A3o8apErSl2EveA9A3tM2l/MAwGCCqFAwcBAQMCBQAwajEL
+MAkGA1UEBhMCUlUxDzANBgNVBAgMBlJ1c3NpYTEPMA0GA1UEBwwGTW9zY293MRYw
+FAYDVQQKDA1oeXBlcnRlc3QuY29tMSEwHwYDVQQDDBh0bHNjYS5vcmcxLmh5cGVy
+dGVzdC5jb20wHhcNMjEwMzIyMTU0NzI1WhcNMzEwMzIwMTU0NzI1WjBSMQswCQYD
+VQQGEwJSVTEPMA0GA1UECAwGUnVzc2lhMQ8wDQYDVQQHDAZNb3Njb3cxITAfBgNV
+BAMMGFRMUy5DTElFTlRAaHlwZXJ0ZXN0LmNvbTBmMB8GCCqFAwcBAQEBMBMGByqF
+AwICIwEGCCqFAwcBAQICA0MABEDDpEF9eAzcB4lQrH4awqQI9/+naWpfZ3JQYeZ+
+ceXdnpKLkue+gMak8ytYy1k80G9F/tVdK4nV7Byebl2J3UUmMAwGCCqFAwcBAQMC
+BQADQQAL8EisY9zbQ9WbQqgBJDWDDt0Jv3616tf4hpyIVrCno00BB8kh98nMGr9n
+zpyyLKNndWX1rNQKQZTXql2BFQS7
+</ds:X509Certificate></ds:X509Data></ds:KeyInfo></ds:Signature></PurchaseOrder>
