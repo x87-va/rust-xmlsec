@@ -950,8 +950,6 @@ kO9N4axmKDI4W6XWtxTRifLySfnklNqn20MEF1PstW18lwkKCAninmVorqil5MKoXKjuFrBJv06u
 
     #[test]
     fn test_verify_file() {
-        pretty_env_logger::init();
-
         let _engine = openssl_gost_engine::Engine::new().expect("Init GOST Engine");
 
         let source_xml = fs::read_to_string("testdata/signed.xml").expect("Read signed XML file");
