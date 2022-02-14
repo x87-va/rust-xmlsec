@@ -1,16 +1,15 @@
 use std::borrow::Cow;
 use std::cmp;
 
-use xml::reader;
-use xml::writer;
+use xml::{reader, writer};
 
-fn canon_attr_map<'a>(a: &'a xml::attribute::OwnedAttribute) -> (xml::name::Name<'a>, String) {
+fn canon_attr_map(attribute: &xml::attribute::OwnedAttribute) -> (xml::name::Name, String) {
     let attribute_re = regex::Regex::new(r"[ \r\n\t]").unwrap();
 
     (
-        a.name.borrow(),
+        attribute.name.borrow(),
         attribute_re
-            .replace_all(&a.value, " ")
+            .replace_all(&attribute.value, " ")
             .replace("&", "&amp;")
             .replace("<", "&lt;")
             .replace("\"", "&quot;")
@@ -86,7 +85,7 @@ pub fn canonical_rfc3076(
                             .0
                             .iter()
                             .filter(|n| {
-                                name.prefix.as_deref() == Some(&n.0)
+                                name.prefix.as_deref() == Some(n.0)
                                     || attribute_prefixes.contains(&Some(n.1))
                             })
                             .map(|n| (n.0.as_str(), n.1.as_str()))
@@ -114,7 +113,7 @@ pub fn canonical_rfc3076(
                                     .iter()
                                     .flatten()
                                     .filter(|a| !existing_xms_ns_attrs.contains(&a.name.local_name))
-                                    .map(|a| *a),
+                                    .copied(),
                             )
                             .map(canon_attr_map)
                             .collect()
@@ -149,7 +148,7 @@ pub fn canonical_rfc3076(
                         namespace: if exclusive {
                             Cow::Owned(exc_ns_stack.squash())
                         } else {
-                            Cow::Borrowed(&namespace)
+                            Cow::Borrowed(namespace)
                         },
                     })
                 } else {
