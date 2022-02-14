@@ -1,7 +1,7 @@
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct OuterSignatre {
     #[serde(rename = "{http://www.w3.org/2000/09/xmldsig#}ds:Signature")]
-    pub signature: Signature,
+    pub signatures: Vec<Signature>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

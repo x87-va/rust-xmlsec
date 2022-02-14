@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no" ?><PurchaseOrder>
+	<Item Id="game130046593231">
+		<Description>Видео игра Doom 3</Description>
+		<Price>300.29</Price>
+	</Item>
+	<Buyer Id="ivan8492340">
+		<Name>Иван Петров</Name>
+		<Address>
+			<Street>Большая Комитетская</Street>
+			<Town>Юбилейный</Town>
+			<State>МО</State>
+			<Country>Российская Федерация</Country>
+			<PostalCode>141090</PostalCode>
+		</Address>
+	</Buyer>
+<ds:Signature xmlns:ds="http://www.w3.org/2000/09/xmldsig#" Id="sign1"><ds:SignedInfo><ds:CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/><ds:SignatureMethod Algorithm="urn:ietf:params:xml:ns:cpxmlsec:algorithms:gostr34102012-gostr34112012-256"/><ds:Reference URI="#game130046593231"><ds:Transforms><ds:Transform Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/></ds:Transforms><ds:DigestMethod Algorithm="urn:ietf:params:xml:ns:cpxmlsec:algorithms:gostr34112012-256"/><ds:DigestValue>EgUW6nsuVvslnvr92aENnY09btvaSDLo3brXVNf/P1c=</ds:DigestValue></ds:Reference><ds:Reference URI="#ivan8492340"><ds:Transforms><ds:Transform Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/></ds:Transforms><ds:DigestMethod Algorithm="urn:ietf:params:xml:ns:cpxmlsec:algorithms:gostr34112012-256"/><ds:DigestValue>03xwgjVZ+MUUXwfoX9TKBJYhU8PcNaxzsT6Cu9rsvxw=</ds:DigestValue></ds:Reference></ds:SignedInfo><ds:SignatureValue>BZe6YHVhIFlZAkyCusnruP/X7ektw27gNANjpSVGtokfvC70nkHMg/waVh7hNzbXodBLUCaw58PsYp+hVByUQQ==</ds:SignatureValue><ds:KeyInfo><ds:X509Data><ds:X509Certificate>MIICMjCCAd2gAwIBAgIRAKMtZy1AnIhXA42CwKpS7u8wDAYIKoUDBwEBAwIFADBo
+MQswCQYDVQQGEwJSVTEXMBUGA1UECAwOU3QuIFBldGVyc2J1cmcxFzAVBgNVBAcM
+DlN0LiBQZXRlcnNidXJnMREwDwYDVQQKDAhhbHBoYS5ydTEUMBIGA1UEAwwLY2Eu
+YWxwaGEucnUwHhcNMjIwMTI3MTAxOTAwWhcNMzIwMTI1MTAxODU5WjBpMQswCQYD
+VQQGEwJSVTEXMBUGA1UECAwOU3QuIFBldGVyc2J1cmcxFzAVBgNVBAcMDlN0LiBQ
+ZXRlcnNidXJnMQ8wDQYDVQQLDAZjbGllbnQxFzAVBgNVBAMMDlVzZXIxQGFscGhh
+LnJ1MF4wFwYIKoUDBwEBAQEwCwYJKoUDBwECAQEBA0MABEDK2DiRFkx50duQPOSQ
+H+2H5DMrwbIYrBKtEWZcgwnp6HInot6iAYjXayLh4yU+bPTlRXFN/s4mRyFmHxcI
+VozMo2AwXjAMBgNVHRMBAf8EAjAAMA4GA1UdDwEB/wQEAwIHgDAdBgNVHQ4EFgQU
+/CZ3Sas/jJ9lQHdCUx817VbmD08wHwYDVR0jBBgwFoAUkCO9dmWb768FJvbFMNyx
+WfA0VHgwDAYIKoUDBwEBAwIFAANBABNb4oZQ0t7DsGmi+U/Kton5E5MlTXoVuDj6
+nFhPWQUmMXvmaWKmiF/HxOAlaGsemxnYFwyXpDtJM+b8VRU+KMQ=
+</ds:X509Certificate></ds:X509Data></ds:KeyInfo></ds:Signature><ds:Signature xmlns:ds="http://www.w3.org/2000/09/xmldsig#" Id="sign2"><ds:SignedInfo><ds:CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/><ds:SignatureMethod Algorithm="urn:ietf:params:xml:ns:cpxmlsec:algorithms:gostr34102012-gostr34112012-256"/><ds:Reference URI="#game130046593231"><ds:Transforms><ds:Transform Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/></ds:Transforms><ds:DigestMethod Algorithm="urn:ietf:params:xml:ns:cpxmlsec:algorithms:gostr34112012-256"/><ds:DigestValue>EgUW6nsuVvslnvr92aENnY09btvaSDLo3brXVNf/P1c=</ds:DigestValue></ds:Reference><ds:Reference URI="#ivan8492340"><ds:Transforms><ds:Transform Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/></ds:Transforms><ds:DigestMethod Algorithm="urn:ietf:params:xml:ns:cpxmlsec:algorithms:gostr34112012-256"/><ds:DigestValue>03xwgjVZ+MUUXwfoX9TKBJYhU8PcNaxzsT6Cu9rsvxw=</ds:DigestValue></ds:Reference></ds:SignedInfo><ds:SignatureValue>K4UlMoGMHDNDhLuILZhAUKDN6NKtigyhOGqTDQFPuZMM9Y/awuy8FXctVI3tUFDsp2/yxYI7yEaudxtglAVZcw==</ds:SignatureValue><ds:KeyInfo><ds:X509Data><ds:X509Certificate>MIICMjCCAd2gAwIBAgIRAKMtZy1AnIhXA42CwKpS7u8wDAYIKoUDBwEBAwIFADBo
+MQswCQYDVQQGEwJSVTEXMBUGA1UECAwOU3QuIFBldGVyc2J1cmcxFzAVBgNVBAcM
+DlN0LiBQZXRlcnNidXJnMREwDwYDVQQKDAhhbHBoYS5ydTEUMBIGA1UEAwwLY2Eu
+YWxwaGEucnUwHhcNMjIwMTI3MTAxOTAwWhcNMzIwMTI1MTAxODU5WjBpMQswCQYD
+VQQGEwJSVTEXMBUGA1UECAwOU3QuIFBldGVyc2J1cmcxFzAVBgNVBAcMDlN0LiBQ
+ZXRlcnNidXJnMQ8wDQYDVQQLDAZjbGllbnQxFzAVBgNVBAMMDlVzZXIxQGFscGhh
+LnJ1MF4wFwYIKoUDBwEBAQEwCwYJKoUDBwECAQEBA0MABEDK2DiRFkx50duQPOSQ
+H+2H5DMrwbIYrBKtEWZcgwnp6HInot6iAYjXayLh4yU+bPTlRXFN/s4mRyFmHxcI
+VozMo2AwXjAMBgNVHRMBAf8EAjAAMA4GA1UdDwEB/wQEAwIHgDAdBgNVHQ4EFgQU
+/CZ3Sas/jJ9lQHdCUx817VbmD08wHwYDVR0jBBgwFoAUkCO9dmWb768FJvbFMNyx
+WfA0VHgwDAYIKoUDBwEBAwIFAANBABNb4oZQ0t7DsGmi+U/Kton5E5MlTXoVuDj6
+nFhPWQUmMXvmaWKmiF/HxOAlaGsemxnYFwyXpDtJM+b8VRU+KMQ=
+</ds:X509Certificate></ds:X509Data></ds:KeyInfo></ds:Signature></PurchaseOrder>

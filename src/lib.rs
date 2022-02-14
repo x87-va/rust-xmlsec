@@ -573,7 +573,7 @@ fn verify_signature(
 pub enum Output {
     Verified {
         references: Vec<String>,
-        pkey: openssl::pkey::PKey<openssl::pkey::Public>,
+        // pkey: openssl::pkey::PKey<openssl::pkey::Public>,
     },
     Unsigned(String),
 }
@@ -637,103 +637,110 @@ pub fn decode_and_verify_signed_document(source_xml: &str) -> Result<Output, Str
 
     let mut verified_outputs = vec![];
 
-    for reference in &sig.signature.signed_info.reference {
-        let uri = reference.uri.as_deref().unwrap_or_default();
+    for signature in &sig.signatures {
+        // Verify references
+        for reference in &signature.signed_info.reference {
+            let uri = reference.uri.as_deref().unwrap_or_default();
 
-        let data = if uri.is_empty() {
-            reader.as_slice()
-        } else if let Some(id) = uri.strip_prefix('#') {
-            match find_events_slice_by_id(&reader, id) {
-                Some(events) => events,
-                None => return Err(format!("unable to find signed element: {}", uri)),
+            let data = if uri.is_empty() {
+                reader.as_slice()
+            } else if let Some(id) = uri.strip_prefix('#') {
+                match find_events_slice_by_id(&reader, id) {
+                    Some(events) => events,
+                    None => return Err(format!("unable to find signed element: {}", uri)),
+                }
+            } else {
+                return Err(format!("unsupported reference URI: {}", uri));
+            };
+
+            let signed_data = apply_transforms(reference, AlgorithmData::NodeSet(data))?;
+
+            let provided_digest = match base64::decode(&reference.digest_value) {
+                Ok(value) => value,
+                Err(error) => return Err(format!("invalid disest base64: {}", error)),
+            };
+
+            let md = map_digest(&reference.digest_method)?;
+
+            let digest = match openssl::hash::hash(md, signed_data.as_bytes()) {
+                Ok(value) => value,
+                Err(error) => return Err(format!("openssl error: {}", error)),
+            };
+
+            if digest.as_ref() != provided_digest {
+                return Err("digest does not match".to_string());
             }
+
+            verified_outputs.push(signed_data);
+        }
+
+        // Verify signature
+        let signed_info_events =
+            AlgorithmData::NodeSet(find_signed_info(&reader[sig_i..sig_end_i + 1]).unwrap());
+
+        let canon_method = match signature
+            .signed_info
+            .canonicalization_method
+            .algorithm
+            .as_str()
+        {
+            CANONICAL_1_0 => transform_canonical_xml_1_0(signed_info_events)?,
+            CANONICAL_1_0_COMMENTS => {
+                transform_canonical_xml_1_0_with_comments(signed_info_events)?
+            }
+            CANONICAL_1_1 => transform_canonical_xml_1_1(signed_info_events)?,
+            CANONICAL_1_1_COMMENTS => {
+                transform_canonical_xml_1_1_with_comments(signed_info_events)?
+            }
+            CANONICAL_EXCLUSIVE_1_0 => transform_exclusive_canonical_xml_1_0(signed_info_events)?,
+            CANONICAL_EXCLUSIVE_1_0_COMMENTS => {
+                transform_exclusive_canonical_xml_1_0_with_comments(signed_info_events)?
+            }
+            unsupported => {
+                return Err(format!(
+                    "unsupported canonicalisation method: {}",
+                    unsupported
+                ))
+            }
+        };
+
+        let signed_info_data = match canon_method.into_inner_data() {
+            InnerAlgorithmData::OctetStream(o) => o.to_string(),
+            _ => unreachable!(),
+        };
+
+        let pkey = if let Some(ki) = &signature.key_info {
+            decode_key(ki)?
         } else {
-            return Err(format!("unsupported reference URI: {}", uri));
+            return Err("key info not specified".to_string());
         };
 
-        let signed_data = apply_transforms(reference, AlgorithmData::NodeSet(data))?;
-
-        let provided_digest = match base64::decode(&reference.digest_value) {
-            Ok(value) => value,
-            Err(error) => return Err(format!("invalid disest base64: {}", error)),
+        let sig_data = match base64::decode(
+            &signature
+                .signature_value
+                .value
+                .replace("\r", "")
+                .replace("\n", ""),
+        ) {
+            Ok(s) => s,
+            Err(e) => {
+                return Err(format!("error decoding signature: {}", e));
+            }
         };
 
-        let md = map_digest(&reference.digest_method)?;
-
-        let digest = match openssl::hash::hash(md, signed_data.as_bytes()) {
-            Ok(value) => value,
-            Err(error) => return Err(format!("openssl error: {}", error)),
-        };
-
-        if digest.as_ref() != provided_digest {
-            return Err("digest does not match".to_string());
+        if !verify_signature(
+            &signature.signed_info.signature_method,
+            &pkey,
+            &sig_data,
+            signed_info_data.as_bytes(),
+        ) {
+            return Err("signature does not verify".to_string());
         }
-
-        verified_outputs.push(signed_data);
-    }
-
-    let signed_info_events =
-        AlgorithmData::NodeSet(find_signed_info(&reader[sig_i..sig_end_i + 1]).unwrap());
-
-    let canon_method = match sig
-        .signature
-        .signed_info
-        .canonicalization_method
-        .algorithm
-        .as_str()
-    {
-        CANONICAL_1_0 => transform_canonical_xml_1_0(signed_info_events)?,
-        CANONICAL_1_0_COMMENTS => transform_canonical_xml_1_0_with_comments(signed_info_events)?,
-        CANONICAL_1_1 => transform_canonical_xml_1_1(signed_info_events)?,
-        CANONICAL_1_1_COMMENTS => transform_canonical_xml_1_1_with_comments(signed_info_events)?,
-        CANONICAL_EXCLUSIVE_1_0 => transform_exclusive_canonical_xml_1_0(signed_info_events)?,
-        CANONICAL_EXCLUSIVE_1_0_COMMENTS => {
-            transform_exclusive_canonical_xml_1_0_with_comments(signed_info_events)?
-        }
-        unsupported => {
-            return Err(format!(
-                "unsupported canonicalisation method: {}",
-                unsupported
-            ))
-        }
-    };
-
-    let signed_info_data = match canon_method.into_inner_data() {
-        InnerAlgorithmData::OctetStream(o) => o.to_string(),
-        _ => unreachable!(),
-    };
-
-    let pkey = if let Some(ki) = &sig.signature.key_info {
-        decode_key(ki)?
-    } else {
-        return Err("key info not specified".to_string());
-    };
-
-    let sig_data = match base64::decode(
-        &sig.signature
-            .signature_value
-            .value
-            .replace("\r", "")
-            .replace("\n", ""),
-    ) {
-        Ok(s) => s,
-        Err(e) => {
-            return Err(format!("error decoding signature: {}", e));
-        }
-    };
-
-    if !verify_signature(
-        &sig.signature.signed_info.signature_method,
-        &pkey,
-        &sig_data,
-        signed_info_data.as_bytes(),
-    ) {
-        return Err("signature does not verify".to_string());
     }
 
     Ok(Output::Verified {
         references: verified_outputs,
-        pkey,
+        // pkey,
     })
 }
 
@@ -857,7 +864,9 @@ pub fn sign_document(
         }),
     };
 
-    let outer_signature = proto::ds::OuterSignatre { signature };
+    let signatures = vec![signature];
+
+    let outer_signature = proto::ds::OuterSignatre { signatures };
 
     let signature_events = xml_serde::to_events(&outer_signature).unwrap();
 
@@ -893,9 +902,7 @@ mod tests {
             ("testdata/base_signed.xml", 1, true),
             ("testdata/signed.xml", 1, true),
             ("testdata/signed_xades.xml", 2, true),
-            // ("testdata/signed_iata.xml", 1, true),
-            // ("testdata/signed_cryptopro.xml", 1, true),
-            // ("testdata/signed_whitespaces.xml", 1, true),
+            ("testdata/signed2.xml", 4, true),
         ];
 
         for (file, expected_references, _valid) in test_data {
@@ -907,7 +914,7 @@ mod tests {
 
             if let Output::Verified {
                 references,
-                pkey: _,
+                // pkey: _,
             } = output
             {
                 assert_eq!(references.len(), expected_references);
