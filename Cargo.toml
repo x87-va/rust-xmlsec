@@ -9,7 +9,7 @@ description = "Pure rust XMLSec implementation"
 readme = "README.md"
 
 [dependencies]
-xml_serde = "1"
+xml_serde = { git = "https://github.com/x87-va/xml-serde.git" }
 xml-rs = "0.8"
 regex = "1"
 serde = "1.0"
