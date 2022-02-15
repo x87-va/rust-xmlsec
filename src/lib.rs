@@ -1,6 +1,7 @@
 #[macro_use]
 extern crate serde_derive;
 
+use openssl::pkey;
 use xml::{reader, writer};
 
 pub mod c14n;
@@ -94,40 +95,25 @@ pub fn events_to_string(events: &[reader::XmlEvent]) -> String {
     String::from_utf8_lossy(&output).to_string()
 }
 
-fn decode_key(
-    key_info: &proto::ds::KeyInfo,
-) -> Result<openssl::pkey::PKey<openssl::pkey::Public>, String> {
+fn decode_key(key_info: &proto::ds::KeyInfo) -> Result<pkey::PKey<pkey::Public>, String> {
     match key_info.keys_info.first() {
         Some(proto::ds::KeyInfoType::X509Data(x509data)) => {
             for x509_datum in &x509data.x509_data {
-                if let proto::ds::X509Datum::Certificate(c) = x509_datum {
-                    let c_bin = match base64::decode_config(
-                        c.replace("\r", "").replace("\n", ""),
-                        base64::STANDARD_NO_PAD,
-                    ) {
-                        Ok(d) => d,
-                        Err(e) => {
-                            return Err(format!("error decoding X509 cert: {}", e));
-                        }
-                    };
+                if let proto::ds::X509Datum::Certificate(cert_data) = x509_datum {
+                    let base64_data = cert_data.replace("\r", "").replace("\n", "");
 
-                    let key = match openssl::x509::X509::from_der(&c_bin) {
-                        Ok(d) => d,
-                        Err(e) => {
-                            return Err(format!("error decoding X509 cert: {}", e));
-                        }
-                    };
+                    let data = base64::decode_config(base64_data, base64::STANDARD_NO_PAD)
+                        .map_err(|error| format!("error decoding X509 cert: {}", error))?;
 
-                    let pkey = match key.public_key() {
-                        Ok(d) => d,
-                        Err(e) => {
-                            return Err(format!("error decoding X509 cert: {}", e));
-                        }
-                    };
+                    let certificate = openssl::x509::X509::from_der(&data)
+                        .map_err(|error| format!("error decoding X509 cert: {}", error))?;
 
-                    return Ok(pkey);
+                    return certificate
+                        .public_key()
+                        .map_err(|error| format!("error decoding X509 cert: {}", error));
                 }
             }
+
             Err(format!("unsupported key: {:?}", x509data))
         }
         unsupported => Err(format!("unsupported key: {:?}", unsupported)),
@@ -452,7 +438,7 @@ fn map_digest(method: &proto::ds::DigestMethod) -> Result<openssl::hash::Message
 
 fn verify_signature(
     sm: &proto::ds::SignatureMethod,
-    pkey: &openssl::pkey::PKeyRef<openssl::pkey::Public>,
+    pkey: &pkey::PKeyRef<pkey::Public>,
     signature: &[u8],
     data: &[u8],
 ) -> Result<bool, openssl::error::ErrorStack> {
@@ -518,7 +504,7 @@ fn verify_signature(
             openssl::hash::MessageDigest::sha256()
         }
         SIGNATURE_GOST_256 => {
-            if pkey.id() != openssl::pkey::Id::GOST3410_2012_256 {
+            if pkey.id() != pkey::Id::GOST3410_2012_256 {
                 panic!(
                     "Unsupported key type {:?} for signature algorithm {}",
                     pkey.id(),
@@ -529,7 +515,7 @@ fn verify_signature(
                 .expect("Get GOSTR3411_2012_256 MessageDigest")
         }
         SIGNATURE_GOST_512 => {
-            if pkey.id() != openssl::pkey::Id::GOST3410_2012_512 {
+            if pkey.id() != pkey::Id::GOST3410_2012_512 {
                 panic!(
                     "Unsupported key type {:?} for signature algorithm {}",
                     pkey.id(),
@@ -550,7 +536,7 @@ fn verify_signature(
 pub enum Output {
     Verified {
         references: Vec<String>,
-        // pkey: openssl::pkey::PKey<openssl::pkey::Public>,
+        // pkey: pkey::PKey<pkey::Public>,
     },
     Unsigned(String),
 }
@@ -734,17 +720,17 @@ pub fn decode_and_verify_signed_document(source_xml: &str) -> Result<Output, Str
 
 pub fn sign_document(
     events: &[reader::XmlEvent],
-    pub_key: &openssl::x509::X509Ref,
-    priv_key: &openssl::pkey::PKeyRef<openssl::pkey::Private>,
+    certificate: &openssl::x509::X509Ref,
+    private_key: &pkey::PKeyRef<pkey::Private>,
 ) -> Result<String, String> {
-    let pub_pkey = match pub_key.public_key() {
+    let public_key = match certificate.public_key() {
         Ok(d) => d,
         Err(e) => {
             return Err(format!("openssl error: {}", e));
         }
     };
 
-    if !priv_key.public_eq(&pub_pkey) {
+    if !private_key.public_eq(&public_key) {
         return Err("public and private key don't match".to_string());
     }
 
@@ -788,10 +774,10 @@ pub fn sign_document(
         ref_type: None,
     };
 
-    let (signature_method, digest_method) = match priv_key.id() {
-        openssl::pkey::Id::RSA => (SIGNATURE_RSA_SHA256, openssl::hash::MessageDigest::sha256()),
-        openssl::pkey::Id::DSA => (SIGNATURE_DSA_SHA256, openssl::hash::MessageDigest::sha256()),
-        openssl::pkey::Id::EC => (
+    let (signature_method, digest_method) = match private_key.id() {
+        pkey::Id::RSA => (SIGNATURE_RSA_SHA256, openssl::hash::MessageDigest::sha256()),
+        pkey::Id::DSA => (SIGNATURE_DSA_SHA256, openssl::hash::MessageDigest::sha256()),
+        pkey::Id::EC => (
             SIGNATURE_ECDSA_SHA512,
             openssl::hash::MessageDigest::sha512(),
         ),
@@ -818,7 +804,7 @@ pub fn sign_document(
             _ => unreachable!(),
         };
 
-    let mut signer = match openssl::sign::Signer::new(digest_method, priv_key) {
+    let mut signer = match openssl::sign::Signer::new(digest_method, private_key) {
         Ok(d) => d,
         Err(e) => {
             return Err(format!("openssl error: {}", e));
@@ -836,21 +822,27 @@ pub fn sign_document(
         }
     };
 
+    let x509_data = proto::ds::X509Data {
+        x509_data: vec![
+            proto::ds::X509Datum::SubjectName(x509_name_to_string(certificate.subject_name())),
+            proto::ds::X509Datum::Certificate(base64::encode(certificate.to_der().unwrap())),
+        ],
+    };
+
+    let key_info = proto::ds::KeyInfo {
+        keys_info: vec![proto::ds::KeyInfoType::X509Data(x509_data)],
+    };
+
+    let signature_value = proto::ds::SignatureValue {
+        value: base64::encode(&signature),
+        id: None,
+    };
+
     let signature = proto::ds::Signature {
         id: None,
         signed_info,
-        signature_value: proto::ds::SignatureValue {
-            value: base64::encode(&signature),
-            id: None,
-        },
-        key_info: Some(proto::ds::KeyInfo {
-            keys_info: vec![proto::ds::KeyInfoType::X509Data(proto::ds::X509Data {
-                x509_data: vec![
-                    proto::ds::X509Datum::SubjectName(x509_name_to_string(pub_key.subject_name())),
-                    proto::ds::X509Datum::Certificate(base64::encode(pub_key.to_der().unwrap())),
-                ],
-            })],
-        }),
+        signature_value,
+        key_info: Some(key_info),
     };
 
     let outer_signature = proto::ds::OuterSignature { signature };
