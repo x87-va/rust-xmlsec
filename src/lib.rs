@@ -48,6 +48,9 @@ pub const SIGNATURE_GOST_256: &str =
 pub const SIGNATURE_GOST_512: &str =
     "urn:ietf:params:xml:ns:cpxmlsec:algorithms:gostr34102012-gostr34112012-512";
 
+const SIGNATURE_ELEMENT_NAME: &str = "Signature";
+const XMLDSIG_NAMESPACE: &str = "http://www.w3.org/2000/09/xmldsig#";
+
 #[inline]
 pub fn x509_name_to_string(name: &openssl::x509::X509NameRef) -> String {
     name.entries()
@@ -184,25 +187,25 @@ fn find_events_slice_by_id<'a>(
 }
 
 fn find_signed_info(events: &[reader::XmlEvent]) -> Option<&[reader::XmlEvent]> {
-    let mut elm_i = events.len();
-    let mut elm_end_i = elm_i;
-    let mut elm_name = None;
+    let mut element_start = events.len();
+    let mut element_end = element_start;
+    let mut element_name = None;
 
     for (i, event) in events.iter().enumerate() {
         match event {
             reader::XmlEvent::StartElement { name, .. } => {
-                if elm_name.is_none()
-                    && name.namespace.as_deref() == Some("http://www.w3.org/2000/09/xmldsig#")
+                if element_name.is_none()
+                    && name.namespace.as_deref() == Some(XMLDSIG_NAMESPACE)
                     && &name.local_name == "SignedInfo"
                 {
-                    elm_i = i;
-                    elm_name = Some(name.clone());
+                    element_start = i;
+                    element_name = Some(name.clone());
                 }
             }
             reader::XmlEvent::EndElement { name, .. } => {
-                if let Some(elm_name) = &elm_name {
-                    if name == elm_name {
-                        elm_end_i = i;
+                if let Some(element_name) = &element_name {
+                    if name == element_name {
+                        element_end = i;
                         break;
                     }
                 }
@@ -211,11 +214,11 @@ fn find_signed_info(events: &[reader::XmlEvent]) -> Option<&[reader::XmlEvent]> 
         }
     }
 
-    if elm_i == events.len() {
+    if element_start == events.len() {
         return None;
     }
 
-    Some(&events[elm_i..elm_end_i + 1])
+    Some(&events[element_start..element_end + 1])
 }
 
 #[derive(Debug)]
@@ -347,8 +350,8 @@ fn transform_enveloped_signature(events: AlgorithmData) -> Result<AlgorithmData,
             } => {
                 level += 1;
                 if level == 2
-                    && name.namespace.as_deref() == Some("http://www.w3.org/2000/09/xmldsig#")
-                    && name.local_name == "Signature"
+                    && name.namespace.as_deref() == Some(XMLDSIG_NAMESPACE)
+                    && name.local_name == SIGNATURE_ELEMENT_NAME
                 {
                     should_output = false
                 }
@@ -367,8 +370,8 @@ fn transform_enveloped_signature(events: AlgorithmData) -> Result<AlgorithmData,
                     });
                 }
                 if level == 2
-                    && name.namespace.as_deref() == Some("http://www.w3.org/2000/09/xmldsig#")
-                    && name.local_name == "Signature"
+                    && name.namespace.as_deref() == Some(XMLDSIG_NAMESPACE)
+                    && name.local_name == SIGNATURE_ELEMENT_NAME
                 {
                     should_output = true;
                 }
@@ -452,121 +455,95 @@ fn verify_signature(
     pkey: &openssl::pkey::PKeyRef<openssl::pkey::Public>,
     signature: &[u8],
     data: &[u8],
-) -> bool {
+) -> Result<bool, openssl::error::ErrorStack> {
     let md = match sm.algorithm.as_str() {
         SIGNATURE_RSA_MD5 => {
-            if pkey.rsa().is_err() {
-                return false;
-            }
+            pkey.rsa()?;
             openssl::hash::MessageDigest::md5()
         }
         SIGNATURE_RSA_SHA1 => {
-            if pkey.rsa().is_err() {
-                return false;
-            }
+            pkey.rsa()?;
             openssl::hash::MessageDigest::sha1()
         }
         SIGNATURE_RSA_SHA224 => {
-            if pkey.rsa().is_err() {
-                return false;
-            }
+            pkey.rsa()?;
             openssl::hash::MessageDigest::sha224()
         }
         SIGNATURE_RSA_SHA256 => {
-            if pkey.rsa().is_err() {
-                return false;
-            }
+            pkey.rsa()?;
             openssl::hash::MessageDigest::sha256()
         }
         SIGNATURE_RSA_SHA384 => {
-            if pkey.rsa().is_err() {
-                return false;
-            }
+            pkey.rsa()?;
             openssl::hash::MessageDigest::sha384()
         }
         SIGNATURE_RSA_SHA512 => {
-            if pkey.rsa().is_err() {
-                return false;
-            }
+            pkey.rsa()?;
             openssl::hash::MessageDigest::sha512()
         }
         SIGNATURE_RSA_RIPEMD160 => {
-            if pkey.rsa().is_err() {
-                return false;
-            }
+            pkey.rsa()?;
             openssl::hash::MessageDigest::ripemd160()
         }
         SIGNATURE_ECDSA_SHA1 => {
-            if pkey.ec_key().is_err() {
-                return false;
-            }
+            pkey.ec_key()?;
             openssl::hash::MessageDigest::sha1()
         }
         SIGNATURE_ECDSA_SHA224 => {
-            if pkey.ec_key().is_err() {
-                return false;
-            }
+            pkey.ec_key()?;
             openssl::hash::MessageDigest::sha224()
         }
         SIGNATURE_ECDSA_SHA256 => {
-            if pkey.ec_key().is_err() {
-                return false;
-            }
+            pkey.ec_key()?;
             openssl::hash::MessageDigest::sha256()
         }
         SIGNATURE_ECDSA_SHA384 => {
-            if pkey.ec_key().is_err() {
-                return false;
-            }
+            pkey.ec_key()?;
             openssl::hash::MessageDigest::sha384()
         }
         SIGNATURE_ECDSA_SHA512 => {
-            if pkey.ec_key().is_err() {
-                return false;
-            }
+            pkey.ec_key()?;
             openssl::hash::MessageDigest::sha512()
         }
         SIGNATURE_ECDSA_RIPEMD160 => {
-            if pkey.ec_key().is_err() {
-                return false;
-            }
+            pkey.ec_key()?;
             openssl::hash::MessageDigest::ripemd160()
         }
         SIGNATURE_DSA_SHA1 => {
-            if pkey.dsa().is_err() {
-                return false;
-            }
+            pkey.dsa()?;
             openssl::hash::MessageDigest::sha1()
         }
         SIGNATURE_DSA_SHA256 => {
-            if pkey.dsa().is_err() {
-                return false;
-            }
+            pkey.dsa()?;
             openssl::hash::MessageDigest::sha256()
         }
         SIGNATURE_GOST_256 => {
             if pkey.id() != openssl::pkey::Id::GOST3410_2012_256 {
-                return false;
+                panic!(
+                    "Unsupported key type {:?} for signature algorithm {}",
+                    pkey.id(),
+                    SIGNATURE_GOST_256
+                );
             }
             openssl::hash::MessageDigest::from_nid(openssl::nid::Nid::ID_GOSTR3411_2012_256)
-                .unwrap()
+                .expect("Get GOSTR3411_2012_256 MessageDigest")
         }
         SIGNATURE_GOST_512 => {
             if pkey.id() != openssl::pkey::Id::GOST3410_2012_512 {
-                return false;
+                panic!(
+                    "Unsupported key type {:?} for signature algorithm {}",
+                    pkey.id(),
+                    SIGNATURE_GOST_512
+                );
             }
             openssl::hash::MessageDigest::from_nid(openssl::nid::Nid::ID_GOSTR3411_2012_512)
-                .unwrap()
+                .expect("Get GOSTR3411_2012_512 MessageDigest")
         }
-        _ => return false,
+        unsupported => panic!("Unsupported signature algorithm: {}", unsupported),
     };
 
-    let mut verifier = match openssl::sign::Verifier::new(md, pkey) {
-        Ok(v) => v,
-        Err(_) => return false,
-    };
-
-    verifier.verify_oneshot(signature, data).unwrap_or(false)
+    let mut verifier = openssl::sign::Verifier::new(md, pkey)?;
+    verifier.verify_oneshot(signature, data)
 }
 
 #[derive(Debug)]
@@ -588,56 +565,67 @@ pub fn decode_and_verify_signed_document(source_xml: &str) -> Result<Output, Str
     let reader = reader::EventReader::new_with_config(source_xml.as_bytes(), parser_config)
         .into_iter()
         .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| format!("unable to decode XML: {}", e))?;
+        .map_err(|error| format!("unable to decode XML: {}", error))?;
 
     let mut level = 0;
     let mut seen_level = reader.len();
-    let mut sig_i = seen_level;
-    let mut sig_end_i = seen_level;
+    let mut signature_start = reader.len();
+    let mut signature_slices = Vec::new();
 
     for (i, event) in reader.iter().enumerate() {
         match event {
             reader::XmlEvent::StartElement { name, .. } => {
                 level += 1;
-                if level < seen_level
-                    && name.namespace.as_deref() == Some("http://www.w3.org/2000/09/xmldsig#")
-                    && &name.local_name == "Signature"
+
+                if level <= seen_level
+                    && name.namespace.as_deref() == Some(XMLDSIG_NAMESPACE)
+                    && &name.local_name == SIGNATURE_ELEMENT_NAME
                 {
                     seen_level = level;
-                    sig_i = i;
+                    signature_start = i;
                 }
             }
             reader::XmlEvent::EndElement { name, .. } => {
                 if level == seen_level
-                    && name.namespace.as_deref() == Some("http://www.w3.org/2000/09/xmldsig#")
-                    && &name.local_name == "Signature"
+                    && name.namespace.as_deref() == Some(XMLDSIG_NAMESPACE)
+                    && &name.local_name == SIGNATURE_ELEMENT_NAME
                 {
                     seen_level = level;
-                    sig_end_i = i;
+                    signature_slices.push(&reader[signature_start..i + 1]);
                 }
+
                 level -= 1;
             }
             _ => {}
         }
     }
 
-    if sig_i == reader.len() {
+    if signature_start == reader.len() {
         return Ok(Output::Unsigned(source_xml.to_string()));
     }
 
-    let sig_elems = reader[sig_i..sig_end_i + 1]
-        .iter()
-        .map(|e| reader::Result::Ok(e.to_owned()))
-        .collect::<Vec<_>>();
-
-    let sig: proto::ds::OuterSignatre = match xml_serde::from_events(sig_elems.as_slice()) {
-        Ok(s) => s,
-        Err(error) => return Err(format!("unable to decode XML signature: {}", error)),
-    };
-
     let mut verified_outputs = vec![];
 
-    for signature in &sig.signatures {
+    println!(">> Signature count: {}", signature_slices.len());
+
+    for (i, signature_slice) in signature_slices.iter().enumerate() {
+        println!(">> Verifying Signature {}", i);
+
+        let signature_elements = signature_slice
+            .iter()
+            .map(|event| reader::Result::Ok(event.to_owned()))
+            .collect::<Vec<_>>();
+
+        let outer_signature: proto::ds::OuterSignature =
+            match xml_serde::from_events(signature_elements.as_slice()) {
+                Ok(s) => s,
+                Err(error) => return Err(format!("unable to decode XML signature: {}", error)),
+            };
+
+        let signature = &outer_signature.signature;
+
+        // println!(">> {:?}", signature);
+
         // Verify references
         for reference in &signature.signed_info.reference {
             let uri = reference.uri.as_deref().unwrap_or_default();
@@ -675,10 +663,11 @@ pub fn decode_and_verify_signed_document(source_xml: &str) -> Result<Output, Str
         }
 
         // Verify signature
-        let signed_info_events =
-            AlgorithmData::NodeSet(find_signed_info(&reader[sig_i..sig_end_i + 1]).unwrap());
+        let signed_info_events = AlgorithmData::NodeSet(
+            find_signed_info(signature_slice).expect("Find signed info elements"),
+        );
 
-        let canon_method = match signature
+        let canon_signed_info = match signature
             .signed_info
             .canonicalization_method
             .algorithm
@@ -698,43 +687,42 @@ pub fn decode_and_verify_signed_document(source_xml: &str) -> Result<Output, Str
             }
             unsupported => {
                 return Err(format!(
-                    "unsupported canonicalisation method: {}",
+                    "unsupported canonicalization method: {}",
                     unsupported
                 ))
             }
         };
 
-        let signed_info_data = match canon_method.into_inner_data() {
+        let signed_info_data = match canon_signed_info.into_inner_data() {
             InnerAlgorithmData::OctetStream(o) => o.to_string(),
             _ => unreachable!(),
         };
 
-        let pkey = if let Some(ki) = &signature.key_info {
-            decode_key(ki)?
+        let public_key = if let Some(key_info) = &signature.key_info {
+            decode_key(key_info)?
         } else {
             return Err("key info not specified".to_string());
         };
 
-        let sig_data = match base64::decode(
-            &signature
-                .signature_value
-                .value
-                .replace("\r", "")
-                .replace("\n", ""),
-        ) {
-            Ok(s) => s,
-            Err(e) => {
-                return Err(format!("error decoding signature: {}", e));
-            }
-        };
+        let signature_text = &signature
+            .signature_value
+            .value
+            .replace("\r", "")
+            .replace("\n", "");
 
-        if !verify_signature(
+        let signature_data = base64::decode(signature_text)
+            .map_err(|error| format!("error decoding signature: {}", error))?;
+
+        let valid = verify_signature(
             &signature.signed_info.signature_method,
-            &pkey,
-            &sig_data,
+            &public_key,
+            &signature_data,
             signed_info_data.as_bytes(),
-        ) {
-            return Err("signature does not verify".to_string());
+        )
+        .map_err(|error| format!("error verifying signature: {}", error))?;
+
+        if !valid {
+            return Err(format!("Signature {} is invalid", i));
         }
     }
 
@@ -760,7 +748,7 @@ pub fn sign_document(
         return Err("public and private key don't match".to_string());
     }
 
-    let canonicalisied_events =
+    let canonicalizied_events =
         match transform_exclusive_canonical_xml_1_0(AlgorithmData::NodeSet(events))?
             .into_inner_data()
         {
@@ -770,7 +758,7 @@ pub fn sign_document(
 
     let digest = match openssl::hash::hash(
         openssl::hash::MessageDigest::sha256(),
-        canonicalisied_events.as_bytes(),
+        canonicalizied_events.as_bytes(),
     ) {
         Ok(d) => d,
         Err(e) => {
@@ -822,7 +810,7 @@ pub fn sign_document(
     };
 
     let signed_info_events = xml_serde::to_events(&signed_info).unwrap();
-    let canonicalisied_signed_info_events =
+    let canonicalizied_signed_info_events =
         match transform_exclusive_canonical_xml_1_0(AlgorithmData::NodeSet(&signed_info_events))?
             .into_inner_data()
         {
@@ -837,7 +825,7 @@ pub fn sign_document(
         }
     };
 
-    if let Err(e) = signer.update(canonicalisied_signed_info_events.as_bytes()) {
+    if let Err(e) = signer.update(canonicalizied_signed_info_events.as_bytes()) {
         return Err(format!("openssl error: {}", e));
     }
 
@@ -849,6 +837,7 @@ pub fn sign_document(
     };
 
     let signature = proto::ds::Signature {
+        id: None,
         signed_info,
         signature_value: proto::ds::SignatureValue {
             value: base64::encode(&signature),
@@ -864,9 +853,7 @@ pub fn sign_document(
         }),
     };
 
-    let signatures = vec![signature];
-
-    let outer_signature = proto::ds::OuterSignatre { signatures };
+    let outer_signature = proto::ds::OuterSignature { signature };
 
     let signature_events = xml_serde::to_events(&outer_signature).unwrap();
 

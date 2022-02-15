@@ -1,11 +1,13 @@
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct OuterSignatre {
+pub struct OuterSignature {
     #[serde(rename = "{http://www.w3.org/2000/09/xmldsig#}ds:Signature")]
-    pub signatures: Vec<Signature>,
+    pub signature: Signature,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Signature {
+    #[serde(rename = "$attr:Id", default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
     #[serde(rename = "{http://www.w3.org/2000/09/xmldsig#}ds:SignedInfo")]
     pub signed_info: SignedInfo,
     #[serde(rename = "{http://www.w3.org/2000/09/xmldsig#}ds:SignatureValue")]
@@ -16,22 +18,22 @@ pub struct Signature {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SignatureValue {
-    #[serde(rename = "$value")]
-    pub value: String,
     #[serde(rename = "$attr:Id", default, skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
+    #[serde(rename = "$value")]
+    pub value: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SignedInfo {
+    #[serde(rename = "$attr:Id", default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
     #[serde(rename = "{http://www.w3.org/2000/09/xmldsig#}ds:CanonicalizationMethod")]
     pub canonicalization_method: CanonicalizationMethod,
     #[serde(rename = "{http://www.w3.org/2000/09/xmldsig#}ds:SignatureMethod")]
     pub signature_method: SignatureMethod,
     #[serde(rename = "{http://www.w3.org/2000/09/xmldsig#}ds:Reference")]
     pub reference: Vec<Reference>,
-    #[serde(rename = "$attr:Id", default, skip_serializing_if = "Option::is_none")]
-    pub id: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -54,16 +56,6 @@ pub struct KeyInfo {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Reference {
-    #[serde(
-        rename = "{http://www.w3.org/2000/09/xmldsig#}ds:Transforms",
-        default,
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub transforms: Option<Transforms>,
-    #[serde(rename = "{http://www.w3.org/2000/09/xmldsig#}ds:DigestMethod")]
-    pub digest_method: DigestMethod,
-    #[serde(rename = "{http://www.w3.org/2000/09/xmldsig#}ds:DigestValue")]
-    pub digest_value: String,
     #[serde(rename = "$attr:Id", default, skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
     #[serde(rename = "$attr:URI", default, skip_serializing_if = "Option::is_none")]
@@ -74,6 +66,16 @@ pub struct Reference {
         skip_serializing_if = "Option::is_none"
     )]
     pub ref_type: Option<String>,
+    #[serde(
+        rename = "{http://www.w3.org/2000/09/xmldsig#}ds:Transforms",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub transforms: Option<Transforms>,
+    #[serde(rename = "{http://www.w3.org/2000/09/xmldsig#}ds:DigestMethod")]
+    pub digest_method: DigestMethod,
+    #[serde(rename = "{http://www.w3.org/2000/09/xmldsig#}ds:DigestValue")]
+    pub digest_value: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
