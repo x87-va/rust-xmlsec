@@ -70,7 +70,7 @@ pub fn x509_name_to_string(name: &openssl::x509::X509NameRef) -> String {
 }
 
 #[inline]
-pub fn events_to_string(events: &[reader::XmlEvent]) -> String {
+pub fn serialize_events(events: &[reader::XmlEvent]) -> Vec<u8> {
     let mut output = Vec::new();
 
     let emitter_config = writer::EmitterConfig {
@@ -92,7 +92,7 @@ pub fn events_to_string(events: &[reader::XmlEvent]) -> String {
         }
     }
 
-    String::from_utf8_lossy(&output).to_string()
+    return output;
 }
 
 fn decode_key(key_info: &proto::ds::KeyInfo) -> Result<pkey::PKey<pkey::Public>, String> {
@@ -532,23 +532,17 @@ fn verify_signature(
     verifier.verify_oneshot(signature, data)
 }
 
-#[derive(Debug)]
-pub enum Output {
-    Verified {
-        references: Vec<String>,
-        // pkey: pkey::PKey<pkey::Public>,
-    },
-    Unsigned(String),
-}
-
-pub fn decode_and_verify_signed_document(source_xml: &str) -> Result<Output, String> {
+pub fn verify_signed_document(
+    data: &[u8],
+    trust_store: Option<&openssl::x509::store::X509StoreRef>,
+) -> Result<(), String> {
     let parser_config = xml::ParserConfig::new()
         .ignore_comments(false)
         .trim_whitespace(false)
         .coalesce_characters(false)
         .ignore_root_level_whitespace(true);
 
-    let reader = reader::EventReader::new_with_config(source_xml.as_bytes(), parser_config)
+    let reader = reader::EventReader::new_with_config(data, parser_config)
         .into_iter()
         .collect::<Result<Vec<_>, _>>()
         .map_err(|error| format!("unable to decode XML: {}", error))?;
@@ -565,7 +559,7 @@ pub fn decode_and_verify_signed_document(source_xml: &str) -> Result<Output, Str
 
                 if level <= seen_level
                     && name.namespace.as_deref() == Some(XMLDSIG_NAMESPACE)
-                    && &name.local_name == SIGNATURE_ELEMENT_NAME
+                    && name.local_name == SIGNATURE_ELEMENT_NAME
                 {
                     seen_level = level;
                     signature_start = i;
@@ -574,7 +568,7 @@ pub fn decode_and_verify_signed_document(source_xml: &str) -> Result<Output, Str
             reader::XmlEvent::EndElement { name, .. } => {
                 if level == seen_level
                     && name.namespace.as_deref() == Some(XMLDSIG_NAMESPACE)
-                    && &name.local_name == SIGNATURE_ELEMENT_NAME
+                    && name.local_name == SIGNATURE_ELEMENT_NAME
                 {
                     seen_level = level;
                     signature_slices.push(&reader[signature_start..i + 1]);
@@ -587,15 +581,15 @@ pub fn decode_and_verify_signed_document(source_xml: &str) -> Result<Output, Str
     }
 
     if signature_start == reader.len() {
-        return Ok(Output::Unsigned(source_xml.to_string()));
+        return Err("Document is unsigned".to_string());
     }
 
     let mut verified_outputs = vec![];
 
-    println!(">> Signature count: {}", signature_slices.len());
+    // println!(">> Signature count: {}", signature_slices.len());
 
     for (i, signature_slice) in signature_slices.iter().enumerate() {
-        println!(">> Verifying Signature {}", i);
+        // println!(">> Verifying Signature {}", i);
 
         let signature_elements = signature_slice
             .iter()
@@ -712,17 +706,25 @@ pub fn decode_and_verify_signed_document(source_xml: &str) -> Result<Output, Str
         }
     }
 
-    Ok(Output::Verified {
-        references: verified_outputs,
-        // pkey,
-    })
+    return Ok(());
 }
 
 pub fn sign_document(
-    events: &[reader::XmlEvent],
+    data: &[u8],
     certificate: &openssl::x509::X509Ref,
     private_key: &pkey::PKeyRef<pkey::Private>,
-) -> Result<String, String> {
+) -> Result<Vec<u8>, String> {
+    let parser_config = xml::ParserConfig::new()
+        .ignore_comments(false)
+        .trim_whitespace(false)
+        .coalesce_characters(false)
+        .ignore_root_level_whitespace(true);
+
+    let events = reader::EventReader::new_with_config(data, parser_config)
+        .into_iter()
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap();
+
     let public_key = match certificate.public_key() {
         Ok(d) => d,
         Err(e) => {
@@ -735,7 +737,7 @@ pub fn sign_document(
     }
 
     let canonicalizied_events =
-        match transform_exclusive_canonical_xml_1_0(AlgorithmData::NodeSet(events))?
+        match transform_exclusive_canonical_xml_1_0(AlgorithmData::NodeSet(&events))?
             .into_inner_data()
         {
             InnerAlgorithmData::OctetStream(s) => s.to_string(),
@@ -857,7 +859,7 @@ pub fn sign_document(
         }
     }) {
         Some(i) => i + 1,
-        None => return Ok("".to_string()),
+        None => return Ok(Vec::new()),
     };
 
     let mut final_events = vec![];
@@ -865,38 +867,64 @@ pub fn sign_document(
     final_events.extend(signature_events.into_iter());
     final_events.extend_from_slice(&events[start_i..]);
 
-    Ok(events_to_string(&final_events))
+    return Ok(serialize_events(&final_events));
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
     use std::fs;
+    use std::path::Path;
+
+    use openssl::pkey::PKey;
+    use openssl::pkey::Private;
+    use openssl::x509::X509;
+
+    fn open_private_key<P: AsRef<Path>>(
+        path: P,
+    ) -> std::result::Result<PKey<Private>, Box<dyn std::error::Error>> {
+        let data = fs::read(path)?;
+        PKey::private_key_from_pem(&data).map_err(|err| err.into())
+    }
+
+    fn open_certificate<P: AsRef<Path>>(
+        path: P,
+    ) -> std::result::Result<X509, Box<dyn std::error::Error>> {
+        let data = fs::read(path)?;
+        X509::from_pem(&data).map_err(|err| err.into())
+    }
+
+    #[test]
+    fn test_sign() {
+        let data = fs::read("testdata/to_sign.xml").unwrap();
+
+        let certificate = open_certificate("testdata/peer.cert.pem").unwrap();
+        let private_key = open_private_key("testdata/peer.key.pem").unwrap();
+
+        let signed_xml = sign_document(&data, &certificate, &private_key).expect("Sign XML");
+        println!("{:?}", signed_xml);
+    }
 
     #[test]
     fn test_verify_files() {
         let _engine = openssl_gost_engine::Engine::new().expect("Init GOST Engine");
 
         let test_data = [
-            ("testdata/base_signed.xml", 1, true),
-            ("testdata/signed.xml", 1, true),
-            ("testdata/signed_xades.xml", 2, true),
-            ("testdata/signed2.xml", 4, true),
+            ("testdata/base_signed.xml", true),
+            ("testdata/signed.xml", true),
+            ("testdata/signed_xades.xml", true),
+            ("testdata/signed2.xml", true),
         ];
 
-        for (file, expected_references, _valid) in test_data {
-            let source_xml = fs::read_to_string(file).expect("Read signed XML file");
+        for (file, valid) in test_data {
+            let data = fs::read(file).expect("Read signed XML file");
 
-            let output =
-                decode_and_verify_signed_document(&source_xml).expect("Verify signed XML file");
-            println!("{:#?}", output);
-
-            if let Output::Verified {
-                references,
-                // pkey: _,
-            } = output
-            {
-                assert_eq!(references.len(), expected_references);
+            let result = verify_signed_document(&data, None);
+            if valid {
+                assert!(result.is_ok(), "Failed: {:?}", result.err());
+            } else {
+                assert!(result.is_err());
             }
         }
     }

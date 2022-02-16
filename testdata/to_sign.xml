@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<PurchaseOrder>
+	<Item Id="130046593231">
+		<Description>Видео Игра</Description>
+		<Price>300.29</Price>
+	</Item>
+	<Buyer Id="8492340">
+		<Name>Иван Петров</Name>
+		<Address>
+			<Street>Большая Комитетская</Street>
+			<Town>Юбилейный</Town>
+			<State>МО</State>
+			<Country>Российская Федерация</Country>
+			<PostalCode>141090</PostalCode>
+		</Address>
+	</Buyer>
+</PurchaseOrder>
