@@ -415,8 +415,8 @@ fn apply_transforms(
     }
 }
 
-fn map_digest(method: &proto::ds::DigestMethod) -> Result<openssl::hash::MessageDigest, String> {
-    match method.algorithm.as_str() {
+fn map_digest(method: &str) -> Result<openssl::hash::MessageDigest, String> {
+    match method {
         DIGEST_SHA1 => Ok(openssl::hash::MessageDigest::sha1()),
         DIGEST_SHA256 => Ok(openssl::hash::MessageDigest::sha256()),
         DIGEST_SH224 => Ok(openssl::hash::MessageDigest::sha224()),
@@ -628,7 +628,7 @@ pub fn verify_signed_document(
                 Err(error) => return Err(format!("invalid disest base64: {}", error)),
             };
 
-            let md = map_digest(&reference.digest_method)?;
+            let md = map_digest(&reference.digest_method.algorithm)?;
 
             let digest = match openssl::hash::hash(md, signed_data.as_bytes()) {
                 Ok(value) => value,
@@ -777,14 +777,15 @@ pub fn sign_document(
     };
 
     let (signature_method, digest_method) = match private_key.id() {
-        pkey::Id::RSA => (SIGNATURE_RSA_SHA256, openssl::hash::MessageDigest::sha256()),
-        pkey::Id::DSA => (SIGNATURE_DSA_SHA256, openssl::hash::MessageDigest::sha256()),
-        pkey::Id::EC => (
-            SIGNATURE_ECDSA_SHA512,
-            openssl::hash::MessageDigest::sha512(),
-        ),
-        unsupported => return Err(format!("unsupported key format {:?}", unsupported)),
+        pkey::Id::RSA => (SIGNATURE_RSA_SHA256, DIGEST_SHA256),
+        pkey::Id::DSA => (SIGNATURE_DSA_SHA256, DIGEST_SHA256),
+        pkey::Id::EC => (SIGNATURE_ECDSA_SHA256, DIGEST_SHA256),
+        pkey::Id::GOST3410_2012_256 => (SIGNATURE_GOST_256, DIGEST_GOST256),
+        pkey::Id::GOST3410_2012_512 => (SIGNATURE_GOST_512, DIGEST_GOST512),
+        unsupported => return Err(format!("unsupported private key type: {:?}", unsupported)),
     };
+
+    let md = map_digest(digest_method)?;
 
     let signed_info = proto::ds::SignedInfo {
         id: None,
@@ -798,6 +799,7 @@ pub fn sign_document(
     };
 
     let signed_info_events = xml_serde::to_events(&signed_info).unwrap();
+
     let canonicalizied_signed_info_events =
         match transform_exclusive_canonical_xml_1_0(AlgorithmData::NodeSet(&signed_info_events))?
             .into_inner_data()
@@ -806,23 +808,14 @@ pub fn sign_document(
             _ => unreachable!(),
         };
 
-    let mut signer = match openssl::sign::Signer::new(digest_method, private_key) {
-        Ok(d) => d,
-        Err(e) => {
-            return Err(format!("openssl error: {}", e));
-        }
-    };
-
-    if let Err(e) = signer.update(canonicalizied_signed_info_events.as_bytes()) {
-        return Err(format!("openssl error: {}", e));
-    }
-
-    let signature = match signer.sign_to_vec() {
-        Ok(d) => d,
-        Err(e) => {
-            return Err(format!("openssl error: {}", e));
-        }
-    };
+    let mut signer = openssl::sign::Signer::new(md, private_key)
+        .map_err(|error| format!("openssl error: {}", error))?;
+    signer
+        .update(canonicalizied_signed_info_events.as_bytes())
+        .map_err(|error| format!("openssl error: {}", error))?;
+    let signature = signer
+        .sign_to_vec()
+        .map_err(|error| format!("openssl error: {}", error))?;
 
     let x509_data = proto::ds::X509Data {
         x509_data: vec![
@@ -867,7 +860,9 @@ pub fn sign_document(
     final_events.extend(signature_events.into_iter());
     final_events.extend_from_slice(&events[start_i..]);
 
-    return Ok(serialize_events(&final_events));
+    let signed_data = serialize_events(&final_events);
+
+    return Ok(signed_data);
 }
 
 #[cfg(test)]
@@ -896,14 +891,21 @@ mod tests {
     }
 
     #[test]
-    fn test_sign() {
+    fn test_sign_verify() {
         let data = fs::read("testdata/to_sign.xml").unwrap();
 
         let certificate = open_certificate("testdata/peer.cert.pem").unwrap();
         let private_key = open_private_key("testdata/peer.key.pem").unwrap();
 
-        let signed_xml = sign_document(&data, &certificate, &private_key).expect("Sign XML");
-        println!("{:?}", signed_xml);
+        let signed_data = sign_document(&data, &certificate, &private_key).expect("Sign XML");
+        // println!("{}", String::from_utf8(signed_data.clone()).unwrap());
+
+        let result = verify_signed_document(&signed_data, None);
+        assert!(
+            result.is_ok(),
+            "Failed to verify signed document: {:?}",
+            result.err()
+        );
     }
 
     #[test]
@@ -922,7 +924,11 @@ mod tests {
 
             let result = verify_signed_document(&data, None);
             if valid {
-                assert!(result.is_ok(), "Failed: {:?}", result.err());
+                assert!(
+                    result.is_ok(),
+                    "Failed to verify signed document: {:?}",
+                    result.err()
+                );
             } else {
                 assert!(result.is_err());
             }
