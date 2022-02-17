@@ -95,7 +95,13 @@ pub fn serialize_events(events: &[reader::XmlEvent]) -> Vec<u8> {
     return output;
 }
 
-fn decode_key(key_info: &proto::ds::KeyInfo) -> Result<pkey::PKey<pkey::Public>, String> {
+fn decode_key<C>(
+    key_info: &proto::ds::KeyInfo,
+    verify_callback: &mut C,
+) -> Result<pkey::PKey<pkey::Public>, String>
+where
+    C: FnMut(&openssl::x509::X509Ref) -> Result<bool, openssl::error::ErrorStack>,
+{
     match key_info.keys_info.first() {
         Some(proto::ds::KeyInfoType::X509Data(x509data)) => {
             for x509_datum in &x509data.x509_data {
@@ -103,14 +109,21 @@ fn decode_key(key_info: &proto::ds::KeyInfo) -> Result<pkey::PKey<pkey::Public>,
                     let base64_data = cert_data.replace("\r", "").replace("\n", "");
 
                     let data = base64::decode_config(base64_data, base64::STANDARD_NO_PAD)
-                        .map_err(|error| format!("error decoding X509 cert: {}", error))?;
+                        .map_err(|error| format!("error decoding X509 certificate: {}", error))?;
 
                     let certificate = openssl::x509::X509::from_der(&data)
-                        .map_err(|error| format!("error decoding X509 cert: {}", error))?;
+                        .map_err(|error| format!("error decoding X509 certificate: {}", error))?;
+
+                    let valid = verify_callback(&certificate)
+                        .map_err(|error| format!("error verifying X509 certificate: {}", error))?;
+
+                    if !valid {
+                        return Err(format!("Certificate {:?} is invalid", certificate));
+                    }
 
                     return certificate
                         .public_key()
-                        .map_err(|error| format!("error decoding X509 cert: {}", error));
+                        .map_err(|error| format!("error decoding X509 certificate: {}", error));
                 }
             }
 
@@ -532,13 +545,22 @@ fn verify_signature(
     verifier.verify_oneshot(signature, data)
 }
 
-pub fn verify_signed_document(
+pub struct VerifyParameters<C>
+where
+    C: FnMut(&openssl::x509::X509Ref) -> Result<bool, openssl::error::ErrorStack>,
+{
+    pub verify_callback: C,
+}
+
+pub fn verify_signed_document<C>(
     data: &[u8],
-    trust_store: Option<&openssl::x509::store::X509StoreRef>,
-) -> Result<(), String> {
+    mut verify_parameters: VerifyParameters<C>,
+) -> Result<(), String>
+where
+    C: FnMut(&openssl::x509::X509Ref) -> Result<bool, openssl::error::ErrorStack>,
+{
     let parser_config = xml::ParserConfig::new()
         .ignore_comments(false)
-        .trim_whitespace(false)
         .coalesce_characters(false)
         .ignore_root_level_whitespace(true);
 
@@ -679,7 +701,7 @@ pub fn verify_signed_document(
         };
 
         let public_key = if let Some(key_info) = &signature.key_info {
-            decode_key(key_info)?
+            decode_key(key_info, &mut verify_parameters.verify_callback)?
         } else {
             return Err("key info not specified".to_string());
         };
@@ -891,7 +913,8 @@ mod tests {
     }
 
     #[test]
-    fn test_sign_verify() {
+    #[ignore]
+    fn sign_verify() {
         let data = fs::read("testdata/to_sign.xml").unwrap();
 
         let certificate = open_certificate("testdata/peer.cert.pem").unwrap();
@@ -900,16 +923,20 @@ mod tests {
         let signed_data = sign_document(&data, &certificate, &private_key).expect("Sign XML");
         // println!("{}", String::from_utf8(signed_data.clone()).unwrap());
 
-        let result = verify_signed_document(&signed_data, None);
+        let verify_callback = |_: &openssl::x509::X509Ref| Ok(true);
+
+        let verify_parameters = VerifyParameters { verify_callback };
+
+        let result = verify_signed_document(&signed_data, verify_parameters);
         assert!(
             result.is_ok(),
             "Failed to verify signed document: {:?}",
-            result.err()
+            result.err().unwrap()
         );
     }
 
     #[test]
-    fn test_verify_files() {
+    fn verify_files() {
         let _engine = openssl_gost_engine::Engine::new().expect("Init GOST Engine");
 
         let test_data = [
@@ -920,18 +947,34 @@ mod tests {
         ];
 
         for (file, valid) in test_data {
-            let data = fs::read(file).expect("Read signed XML file");
+            let data = fs::read(file).unwrap();
 
-            let result = verify_signed_document(&data, None);
+            let verify_callback = |_: &openssl::x509::X509Ref| Ok(true);
+
+            let parameters = VerifyParameters { verify_callback };
+
+            let result = verify_signed_document(&data, parameters);
             if valid {
                 assert!(
                     result.is_ok(),
                     "Failed to verify signed document: {:?}",
-                    result.err()
+                    result.err().unwrap()
                 );
             } else {
                 assert!(result.is_err());
             }
         }
+    }
+
+    #[test]
+    fn failed_to_verify_certificate() {
+        let data = fs::read("testdata/base_signed.xml").unwrap();
+
+        let verify_callback = |_: &openssl::x509::X509Ref| Ok(false);
+
+        let parameters = VerifyParameters { verify_callback };
+
+        let result = verify_signed_document(&data, parameters);
+        assert!(result.is_err());
     }
 }
