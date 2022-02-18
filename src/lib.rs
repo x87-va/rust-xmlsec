@@ -610,7 +610,7 @@ where
 
     // println!(">> Signature count: {}", signature_slices.len());
 
-    for (i, signature_slice) in signature_slices.iter().enumerate() {
+    for (i, signature_slice) in signature_slices.into_iter().enumerate() {
         // println!(">> Verifying Signature {}", i);
 
         let signature_elements = signature_slice
@@ -619,10 +619,8 @@ where
             .collect::<Vec<_>>();
 
         let outer_signature: proto::ds::OuterSignature =
-            match xml_serde::from_events(signature_elements.as_slice()) {
-                Ok(s) => s,
-                Err(error) => return Err(format!("unable to decode XML signature: {}", error)),
-            };
+            xml_serde::from_events(&signature_elements)
+                .map_err(|error| format!("unable to decode XML signature: {}", error))?;
 
         let signature = &outer_signature.signature;
 
