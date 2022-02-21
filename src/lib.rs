@@ -602,16 +602,16 @@ where
         }
     }
 
+    log::debug!("Found signatures: {}", signature_slices.len());
+
     if signature_start == reader.len() {
         return Err("Document is unsigned".to_string());
     }
 
     let mut verified_outputs = vec![];
 
-    // println!(">> Signature count: {}", signature_slices.len());
-
     for (i, signature_slice) in signature_slices.into_iter().enumerate() {
-        // println!(">> Verifying Signature {}", i);
+        log::trace!("Verifying Signature {}", i);
 
         let signature_elements = signature_slice
             .iter()
@@ -624,10 +624,8 @@ where
 
         let signature = &outer_signature.signature;
 
-        // println!(">> {:?}", signature);
-
         // Verify references
-        for reference in &signature.signed_info.reference {
+        for (j, reference) in signature.signed_info.reference.iter().enumerate() {
             let uri = reference.uri.as_deref().unwrap_or_default();
 
             let data = if uri.is_empty() {
@@ -656,16 +654,17 @@ where
             };
 
             if digest.as_ref() != provided_digest {
-                return Err("digest does not match".to_string());
+                return Err(format!("Reference {} for Signature {} is invalid: digest does not match", j, i));
             }
+
+            log::trace!("Reference {} for Signature {} is valid", j, i);
 
             verified_outputs.push(signed_data);
         }
 
         // Verify signature
-        let signed_info_events = AlgorithmData::NodeSet(
-            find_signed_info(signature_slice).expect("Find signed info elements"),
-        );
+        let signed_info = find_signed_info(signature_slice).ok_or("Failed to find signed info element")?;
+        let signed_info_data = AlgorithmData::NodeSet(signed_info);
 
         let canon_signed_info = match signature
             .signed_info
@@ -673,17 +672,17 @@ where
             .algorithm
             .as_str()
         {
-            CANONICAL_1_0 => transform_canonical_xml_1_0(signed_info_events)?,
+            CANONICAL_1_0 => transform_canonical_xml_1_0(signed_info_data)?,
             CANONICAL_1_0_COMMENTS => {
-                transform_canonical_xml_1_0_with_comments(signed_info_events)?
+                transform_canonical_xml_1_0_with_comments(signed_info_data)?
             }
-            CANONICAL_1_1 => transform_canonical_xml_1_1(signed_info_events)?,
+            CANONICAL_1_1 => transform_canonical_xml_1_1(signed_info_data)?,
             CANONICAL_1_1_COMMENTS => {
-                transform_canonical_xml_1_1_with_comments(signed_info_events)?
+                transform_canonical_xml_1_1_with_comments(signed_info_data)?
             }
-            CANONICAL_EXCLUSIVE_1_0 => transform_exclusive_canonical_xml_1_0(signed_info_events)?,
+            CANONICAL_EXCLUSIVE_1_0 => transform_exclusive_canonical_xml_1_0(signed_info_data)?,
             CANONICAL_EXCLUSIVE_1_0_COMMENTS => {
-                transform_exclusive_canonical_xml_1_0_with_comments(signed_info_events)?
+                transform_exclusive_canonical_xml_1_0_with_comments(signed_info_data)?
             }
             unsupported => {
                 return Err(format!(
@@ -724,6 +723,8 @@ where
         if !valid {
             return Err(format!("Signature {} is invalid", i));
         }
+
+        log::trace!("Signature {} is valid", i);
     }
 
     return Ok(());
